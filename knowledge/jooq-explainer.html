@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>jOOQ vs JPA vs MyBatis</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --border: #1e1e2e;
+    --jooq: #00e5ff;
+    --jpa: #ff6b6b;
+    --mybatis: #a8ff78;
+    --text: #e0e0f0;
+    --muted: #6b6b8a;
+    --accent: #7c3aed;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+    position: relative;
+    z-index: 1;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 60px;
+  }
+
+  .tag {
+    display: inline-block;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--jooq);
+    border: 1px solid var(--jooq);
+    padding: 4px 12px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+    opacity: 0.8;
+  }
+
+  h1 {
+    font-size: clamp(2.4rem, 6vw, 4.5rem);
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -2px;
+    margin-bottom: 16px;
+  }
+
+  h1 span.jooq { color: var(--jooq); }
+  h1 span.jpa { color: var(--jpa); }
+  h1 span.mybatis { color: var(--mybatis); }
+
+  .subtitle {
+    color: var(--muted);
+    font-size: 1rem;
+    font-family: 'Space Mono', monospace;
+    letter-spacing: 0.5px;
+  }
+
+  /* Section headers */
+  .section-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 20px;
+    padding-left: 2px;
+  }
+
+  /* Framework cards */
+  .frameworks {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 60px;
+  }
+
+  @media (max-width: 700px) {
+    .frameworks { grid-template-columns: 1fr; }
+  }
+
+  .fw-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 28px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .fw-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    transition: opacity 0.2s;
+  }
+
+  .fw-card.jooq::before { background: var(--jooq); }
+  .fw-card.jpa::before { background: var(--jpa); }
+  .fw-card.mybatis::before { background: var(--mybatis); }
+
+  .fw-card:hover, .fw-card.active {
+    border-color: #2a2a3e;
+    transform: translateY(-2px);
+  }
+
+  .fw-card.active { border-color: #2e2e50; }
+
+  .fw-name {
+    font-size: 1.6rem;
+    font-weight: 800;
+    letter-spacing: -1px;
+    margin-bottom: 8px;
+  }
+
+  .fw-card.jooq .fw-name { color: var(--jooq); }
+  .fw-card.jpa .fw-name { color: var(--jpa); }
+  .fw-card.mybatis .fw-name { color: var(--mybatis); }
+
+  .fw-tagline {
+    font-size: 0.75rem;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    line-height: 1.6;
+  }
+
+  /* Detail panel */
+  .detail-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 36px;
+    margin-bottom: 60px;
+    display: none;
+    animation: fadeIn 0.25s ease;
+  }
+
+  .detail-panel.visible { display: block; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .detail-title {
+    font-size: 1.8rem;
+    font-weight: 800;
+    letter-spacing: -1px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+
+  .pros-cons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 28px;
+  }
+
+  @media (max-width: 600px) {
+    .pros-cons { grid-template-columns: 1fr; }
+  }
+
+  .pc-block h4 {
+    font-size: 0.7rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    font-family: 'Space Mono', monospace;
+    margin-bottom: 12px;
+    opacity: 0.7;
+  }
+
+  .pc-block.pros h4 { color: #00e5ff; }
+  .pc-block.cons h4 { color: #ff6b6b; }
+
+  .pc-block ul {
+    list-style: none;
+  }
+
+  .pc-block ul li {
+    font-size: 0.88rem;
+    line-height: 1.7;
+    color: var(--text);
+    padding-left: 16px;
+    position: relative;
+    margin-bottom: 4px;
+  }
+
+  .pc-block ul li::before {
+    content: '→';
+    position: absolute;
+    left: 0;
+    opacity: 0.5;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.75rem;
+  }
+
+  .code-block {
+    background: #080810;
+    border: 1px solid var(--border);
+    padding: 20px;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.75rem;
+    line-height: 1.8;
+    overflow-x: auto;
+    margin-top: 20px;
+  }
+
+  .code-block .comment { color: var(--muted); }
+  .code-block .kw { color: #c678dd; }
+  .code-block .fn { color: #61afef; }
+  .code-block .str { color: #98c379; }
+  .code-block .type { color: #e5c07b; }
+
+  /* Comparison table */
+  .comparison {
+    margin-bottom: 60px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+  }
+
+  th {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 12px 16px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  th.jooq { color: var(--jooq); }
+  th.jpa { color: var(--jpa); }
+  th.mybatis { color: var(--mybatis); }
+
+  td {
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    vertical-align: top;
+    line-height: 1.5;
+  }
+
+  td:first-child {
+    font-weight: 700;
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-family: 'Space Mono', monospace;
+    white-space: nowrap;
+  }
+
+  tr:hover td { background: rgba(255,255,255,0.015); }
+
+  .badge {
+    display: inline-block;
+    font-size: 0.65rem;
+    font-family: 'Space Mono', monospace;
+    padding: 2px 7px;
+    border-radius: 2px;
+    letter-spacing: 1px;
+  }
+
+  .badge.green { background: rgba(168,255,120,0.15); color: var(--mybatis); }
+  .badge.blue { background: rgba(0,229,255,0.12); color: var(--jooq); }
+  .badge.red { background: rgba(255,107,107,0.15); color: var(--jpa); }
+  .badge.gray { background: rgba(255,255,255,0.07); color: var(--muted); }
+
+  /* When to use */
+  .when-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+
+  @media (max-width: 700px) {
+    .when-grid { grid-template-columns: 1fr; }
+  }
+
+  .when-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 24px;
+  }
+
+  .when-card h3 {
+    font-size: 0.9rem;
+    font-weight: 700;
+    margin-bottom: 14px;
+    letter-spacing: -0.5px;
+  }
+
+  .when-card.jooq h3 { color: var(--jooq); }
+  .when-card.jpa h3 { color: var(--jpa); }
+  .when-card.mybatis h3 { color: var(--mybatis); }
+
+  .when-card ul {
+    list-style: none;
+  }
+
+  .when-card ul li {
+    font-size: 0.8rem;
+    color: #a0a0c0;
+    padding: 5px 0 5px 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    position: relative;
+    font-family: 'Space Mono', monospace;
+  }
+
+  .when-card ul li::before {
+    content: '▸';
+    position: absolute;
+    left: 0;
+    font-size: 0.6rem;
+    top: 7px;
+  }
+
+  .when-card.jooq ul li::before { color: var(--jooq); }
+  .when-card.jpa ul li::before { color: var(--jpa); }
+  .when-card.mybatis ul li::before { color: var(--mybatis); }
+
+  /* Interview tips */
+  .tips {
+    background: linear-gradient(135deg, rgba(124,58,237,0.08), rgba(0,229,255,0.05));
+    border: 1px solid rgba(124,58,237,0.3);
+    padding: 32px;
+    margin-top: 60px;
+  }
+
+  .tips h2 {
+    font-size: 1.3rem;
+    font-weight: 800;
+    margin-bottom: 20px;
+    color: #c4b5fd;
+    letter-spacing: -0.5px;
+  }
+
+  .tip-item {
+    display: flex;
+    gap: 14px;
+    margin-bottom: 16px;
+    align-items: flex-start;
+  }
+
+  .tip-num {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--accent);
+    background: rgba(124,58,237,0.2);
+    padding: 3px 8px;
+    flex-shrink: 0;
+    letter-spacing: 1px;
+    margin-top: 2px;
+  }
+
+  .tip-text {
+    font-size: 0.88rem;
+    line-height: 1.65;
+    color: #c0c0d8;
+  }
+
+  .tip-text strong { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="tag">ORM Deep Dive · Spring Boot · Kotlin</div>
+    <h1><span class="jooq">jOOQ</span> vs <span class="jpa">JPA</span> vs <span class="mybatis">MyBatis</span></h1>
+    <p class="subtitle">// the real differences your interview panel wants to hear</p>
+  </header>
+
+  <div class="section-label">// click to explore each framework</div>
+  <div class="frameworks">
+    <div class="fw-card jooq" onclick="showDetail('jooq')">
+      <div class="fw-name">jOOQ</div>
+      <div class="fw-tagline">SQL-centric DSL.<br>Type-safe. Code-generated.<br>You write SQL, it enforces it.</div>
+    </div>
+    <div class="fw-card jpa" onclick="showDetail('jpa')">
+      <div class="fw-name">Spring JPA</div>
+      <div class="fw-tagline">Object-centric ORM.<br>Hibernate underneath.<br>Abstracts SQL away entirely.</div>
+    </div>
+    <div class="fw-card mybatis" onclick="showDetail('mybatis')">
+      <div class="fw-name">MyBatis</div>
+      <div class="fw-tagline">SQL-in-XML/annotations.<br>Manual mapping.<br>Middle ground control.</div>
+    </div>
+  </div>
+
+  <!-- Detail panels -->
+  <div id="detail-jooq" class="detail-panel">
+    <div class="detail-title">
+      <span class="dot" style="background:var(--jooq)"></span>
+      jOOQ — Java Object Oriented Querying
+    </div>
+    <div class="pros-cons">
+      <div class="pc-block pros">
+        <h4>★ Strengths</h4>
+        <ul>
+          <li>100% type-safe SQL in Kotlin/Java — compile errors, not runtime errors</li>
+          <li>Code generation from your actual schema (tables, columns are real classes)</li>
+          <li>Supports advanced SQL: CTEs, window functions, lateral joins, UPSERT</li>
+          <li>Predictable queries — no N+1, no lazy-load surprises</li>
+          <li>Great for complex analytics and reporting queries</li>
+          <li>Works perfectly with Kotlin's DSL style</li>
+        </ul>
+      </div>
+      <div class="pc-block cons">
+        <h4>✕ Tradeoffs</h4>
+        <ul>
+          <li>More verbose for simple CRUD than JPA</li>
+          <li>Requires schema codegen step in build pipeline</li>
+          <li>Less intuitive if team doesn't know SQL well</li>
+          <li>Commercial license needed for non-open-source DBs (Oracle, SQL Server)</li>
+          <li>Less community content than Spring JPA</li>
+        </ul>
+      </div>
+    </div>
+    <div class="code-block">
+<span class="comment">// Kotlin + jOOQ — type-safe, reads like SQL, won't compile if column doesn't exist</span>
+<span class="kw">val</span> result = dsl
+    .<span class="fn">select</span>(USERS.ID, USERS.EMAIL, <span class="fn">count</span>(ORDERS.ID))
+    .<span class="fn">from</span>(USERS)
+    .<span class="fn">leftJoin</span>(ORDERS).<span class="fn">on</span>(ORDERS.USER_ID.<span class="fn">eq</span>(USERS.ID))
+    .<span class="fn">where</span>(USERS.ACTIVE.<span class="fn">isTrue</span>())
+    .<span class="fn">groupBy</span>(USERS.ID, USERS.EMAIL)
+    .<span class="fn">having</span>(<span class="fn">count</span>(ORDERS.ID).<span class="fn">gt</span>(<span class="type">5</span>))
+    .<span class="fn">orderBy</span>(<span class="fn">count</span>(ORDERS.ID).<span class="fn">desc</span>())
+    .<span class="fn">fetch</span>()
+
+<span class="comment">// If you rename USERS.EMAIL to USERS.EMAIL_ADDRESS in DB and regenerate:</span>
+<span class="comment">// → this code FAILS TO COMPILE. Caught before runtime. That's the superpower.</span>
+    </div>
+  </div>
+
+  <div id="detail-jpa" class="detail-panel">
+    <div class="detail-title">
+      <span class="dot" style="background:var(--jpa)"></span>
+      Spring Data JPA (Hibernate)
+    </div>
+    <div class="pros-cons">
+      <div class="pc-block pros">
+        <h4>★ Strengths</h4>
+        <ul>
+          <li>Fastest to get started — annotate entity, get CRUD free</li>
+          <li>Domain-driven: think in objects, not tables</li>
+          <li>Magic query derivation: findByEmailAndActive()</li>
+          <li>Huge ecosystem, tutorials, Stack Overflow coverage</li>
+          <li>Works great for simple CRUD applications</li>
+        </ul>
+      </div>
+      <div class="pc-block cons">
+        <h4>✕ Tradeoffs</h4>
+        <ul>
+          <li>N+1 query problem is a constant footgun</li>
+          <li>Lazy loading causes surprising SessionClosed exceptions</li>
+          <li>Generated SQL can be inefficient / hard to debug</li>
+          <li>JPQL is a half-baked SQL — missing window functions, CTEs, etc.</li>
+          <li>Complex joins/aggregations become painful</li>
+          <li>@Entity graph management gets complex fast</li>
+        </ul>
+      </div>
+    </div>
+    <div class="code-block">
+<span class="comment">// Spring JPA — magic interface methods</span>
+<span class="kw">interface</span> <span class="type">UserRepository</span> : JpaRepository&lt;<span class="type">User</span>, <span class="type">Long</span>&gt; {
+    <span class="kw">fun</span> <span class="fn">findByEmailAndActiveTrue</span>(email: <span class="type">String</span>): <span class="type">User</span>?
+}
+
+<span class="comment">// But the moment you need a complex report...</span>
+@<span class="type">Query</span>(<span class="str">"""
+  SELECT u.id, u.email, COUNT(o.id) as orderCount
+  FROM User u LEFT JOIN u.orders o
+  WHERE u.active = true
+  GROUP BY u.id HAVING COUNT(o.id) > 5
+"""</span>) <span class="comment">// JPQL — not real SQL, no window functions allowed</span>
+<span class="kw">fun</span> <span class="fn">findActiveUsersWithManyOrders</span>(): <span class="type">List</span>&lt;<span class="type">UserProjection</span>&gt;
+    </div>
+  </div>
+
+  <div id="detail-mybatis" class="detail-panel">
+    <div class="detail-title">
+      <span class="dot" style="background:var(--mybatis)"></span>
+      MyBatis
+    </div>
+    <div class="pros-cons">
+      <div class="pc-block pros">
+        <h4>★ Strengths</h4>
+        <ul>
+          <li>Full SQL control — write exactly what you want</li>
+          <li>Familiar for teams coming from JDBC / stored procedures</li>
+          <li>Dynamic SQL via XML tags (if/choose/foreach)</li>
+          <li>No magic — what you write is what runs</li>
+          <li>Very popular in enterprise Java in Asia (Korea, China, Japan)</li>
+        </ul>
+      </div>
+      <div class="pc-block cons">
+        <h4>✕ Tradeoffs</h4>
+        <ul>
+          <li>SQL in XML/strings = no compile-time type safety</li>
+          <li>Column name typos only caught at runtime</li>
+          <li>Lots of boilerplate for mapping result sets</li>
+          <li>Refactoring is painful — rename a column, manually find all XMLs</li>
+          <li>No schema-driven codegen like jOOQ</li>
+        </ul>
+      </div>
+    </div>
+    <div class="code-block">
+<span class="comment">// MyBatis — mapper XML, no type safety</span>
+<span class="comment">// &lt;select id="findActiveUsersWithOrders" resultMap="UserWithOrders"&gt;</span>
+<span class="comment">//   SELECT u.id, u.email, COUNT(o.id) as order_count</span>
+<span class="comment">//   FROM users u</span>
+<span class="comment">//   LEFT JOIN orders o ON o.user_id = u.id</span>
+<span class="comment">//   WHERE u.active = 1</span>
+<span class="comment">//   GROUP BY u.id, u.emal  ← typo here? found at RUNTIME only</span>
+<span class="comment">// &lt;/select&gt;</span>
+
+<span class="kw">@Mapper</span>
+<span class="kw">interface</span> <span class="type">UserMapper</span> {
+    <span class="kw">fun</span> <span class="fn">findActiveUsersWithOrders</span>(): <span class="type">List</span>&lt;<span class="type">UserWithOrders</span>&gt;
+}
+    </div>
+  </div>
+
+  <!-- Comparison Table -->
+  <div class="comparison">
+    <div class="section-label">// feature comparison matrix</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Criterion</th>
+          <th class="jooq">jOOQ</th>
+          <th class="jpa">Spring JPA</th>
+          <th class="mybatis">MyBatis</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Type Safety</td>
+          <td><span class="badge blue">COMPILE-TIME</span></td>
+          <td><span class="badge gray">PARTIAL</span></td>
+          <td><span class="badge red">RUNTIME</span></td>
+        </tr>
+        <tr>
+          <td>SQL Control</td>
+          <td>Full — DSL mirrors SQL</td>
+          <td>Limited — JPQL subset</td>
+          <td>Full — raw SQL strings</td>
+        </tr>
+        <tr>
+          <td>Complex Queries</td>
+          <td><span class="badge blue">EXCELLENT</span></td>
+          <td><span class="badge red">PAINFUL</span></td>
+          <td><span class="badge green">GOOD</span></td>
+        </tr>
+        <tr>
+          <td>Simple CRUD speed</td>
+          <td><span class="badge gray">MEDIUM</span></td>
+          <td><span class="badge green">FASTEST</span></td>
+          <td><span class="badge gray">SLOW</span></td>
+        </tr>
+        <tr>
+          <td>N+1 problem</td>
+          <td>Not applicable</td>
+          <td>Common pitfall</td>
+          <td>Manual, avoidable</td>
+        </tr>
+        <tr>
+          <td>Schema refactoring</td>
+          <td><span class="badge blue">SAFE — codegen</span></td>
+          <td><span class="badge gray">MEDIUM</span></td>
+          <td><span class="badge red">FRAGILE</span></td>
+        </tr>
+        <tr>
+          <td>Window Functions / CTEs</td>
+          <td><span class="badge blue">NATIVE SUPPORT</span></td>
+          <td><span class="badge red">NOT SUPPORTED</span></td>
+          <td><span class="badge green">RAW SQL OK</span></td>
+        </tr>
+        <tr>
+          <td>Kotlin DSL feel</td>
+          <td><span class="badge blue">NATURAL FIT</span></td>
+          <td><span class="badge gray">DECENT</span></td>
+          <td><span class="badge gray">NEUTRAL</span></td>
+        </tr>
+        <tr>
+          <td>Learning curve</td>
+          <td>Medium — need SQL knowledge</td>
+          <td>Low — hide SQL</td>
+          <td>Low-Medium</td>
+        </tr>
+        <tr>
+          <td>Best for</td>
+          <td>Complex domains, analytics</td>
+          <td>CRUD-heavy microservices</td>
+          <td>Legacy or SQL-heavy teams</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- When to use -->
+  <div>
+    <div class="section-label">// when to choose which</div>
+    <div class="when-grid">
+      <div class="when-card jooq">
+        <h3>Choose jOOQ when...</h3>
+        <ul>
+          <li>Complex reporting / analytics queries</li>
+          <li>You want compile-time guarantees</li>
+          <li>Database is the source of truth</li>
+          <li>Team is SQL-proficient</li>
+          <li>Using PostgreSQL or MySQL (free tier)</li>
+          <li>Frequent schema changes</li>
+        </ul>
+      </div>
+      <div class="when-card jpa">
+        <h3>Choose JPA when...</h3>
+        <ul>
+          <li>Standard CRUD microservice</li>
+          <li>Small/mid team, fast iteration</li>
+          <li>Domain model is primary focus</li>
+          <li>Team thinks in objects not tables</li>
+          <li>Most queries are simple lookups</li>
+        </ul>
+      </div>
+      <div class="when-card mybatis">
+        <h3>Choose MyBatis when...</h3>
+        <ul>
+          <li>Migrating from raw JDBC</li>
+          <li>DBA team owns SQL definitions</li>
+          <li>Stored procedure heavy legacy system</li>
+          <li>Team is SQL-fluent, dislikes ORMs</li>
+          <li>Popular in Korean enterprise stacks</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Interview Tips -->
+  <div class="tips">
+    <h2>⚡ Interview Talking Points</h2>
+    <div class="tip-item">
+      <span class="tip-num">01</span>
+      <div class="tip-text"><strong>Lead with the core jOOQ philosophy:</strong> "jOOQ treats SQL as a first-class citizen rather than something to abstract away. This means queries are written as a Kotlin DSL that maps 1:1 to SQL — compile-time safety, predictable execution plans."</div>
+    </div>
+    <div class="tip-item">
+      <span class="tip-num">02</span>
+      <div class="tip-text"><strong>Mention codegen as the killer feature:</strong> "jOOQ generates Java/Kotlin classes from your actual database schema. If a column is renamed or dropped, the code won't compile — you catch database contract breaks before they hit production."</div>
+    </div>
+    <div class="tip-item">
+      <span class="tip-num">03</span>
+      <div class="tip-text"><strong>Contrast with JPA's tradeoffs:</strong> "JPA is great for CRUD but hides SQL behind JPQL, which doesn't support window functions, CTEs or lateral joins. It also introduces the N+1 problem where fetching a list of entities can silently trigger hundreds of queries."</div>
+    </div>
+    <div class="tip-item">
+      <span class="tip-num">04</span>
+      <div class="tip-text"><strong>Show you understand the tradeoff:</strong> "We chose jOOQ because our domain has complex reporting queries and frequent schema iteration. For a pure CRUD service with simple lookups, Spring JPA would be faster to develop with."</div>
+    </div>
+    <div class="tip-item">
+      <span class="tip-num">05</span>
+      <div class="tip-text"><strong>Kotlin synergy point:</strong> "jOOQ's method chaining DSL feels natural in Kotlin — similar to how Kotlin's standard library is designed. Compared to writing @Query JPQL strings or XML in MyBatis, it feels far more idiomatic."</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  function showDetail(fw) {
+    ['jooq','jpa','mybatis'].forEach(id => {
+      document.getElementById('detail-' + id).classList.remove('visible');
+      document.querySelector('.fw-card.' + id).classList.remove('active');
+    });
+    document.getElementById('detail-' + fw).classList.add('visible');
+    document.querySelector('.fw-card.' + fw).classList.add('active');
+    document.getElementById('detail-' + fw).scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  // Auto-show jOOQ on load
+  setTimeout(() => showDetail('jooq'), 300);
+</script>
+</body>
+</html>
