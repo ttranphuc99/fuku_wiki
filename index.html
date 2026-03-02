@@ -34,6 +34,7 @@
         // 1. DATA: Add your file names and titles here
         const knowledgeData = [
             { title: "JooQ Explainer (compare with JPA and Mybatis)", path: "knowledge/jooq-explainer.html", tags: ["backend", "architecture", "jooq"] },
+            { title: "OAuth2", path: "knowledge/oauth2-explainer.html", tags: ["backend", "authentication"] },
             // Add more entries as you create new HTML files
         ];
 
@@ -45,8 +46,7 @@
 
         function render(data) {
             grid.innerHTML = data.map(item => `
-                <a href="${item.path}" class="block p-6 bg-white rounded-xl border border-slate-100 shadow-sm hover:shadow-md hover:border-blue-300 transition-all group">
-                    <h3 class="text-lg font-semibold text-slate-700 group-hover:text-blue-600">${item.title}</h3>
+                <a href="${item.path}" class="block p-6 bg-white rounded-xl border border-slate-100 shadow-sm hover:shadow-md hover:border-blue-300 files groupnsition-all      <h3 class="text-lg font-semibold text-slate-700 group-hover:text-blue-600">${item.title}</h3>
                     <div class="mt-2 flex gap-2">
                         ${item.tags.map(tag => `<span class="text-xs bg-slate-100 text-slate-500 px-2 py-1 rounded">${tag}</span>`).join('')}
                     </div>
