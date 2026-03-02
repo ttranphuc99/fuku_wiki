@@ -1,0 +1,1832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OAuth2 — Interactive Deep Dive</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=JetBrains+Mono:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0a0f;
+  --surface: #111118;
+  --border: #1e1e2e;
+  --accent: #00ff88;
+  --accent2: #ff6b35;
+  --accent3: #7b61ff;
+  --accent4: #00d4ff;
+  --text: #e8e8f0;
+  --muted: #666680;
+  --glow: 0 0 20px rgba(0,255,136,0.3);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'JetBrains Mono', monospace;
+  overflow-x: hidden;
+  cursor: crosshair;
+}
+
+/* Animated grid background */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: 
+    linear-gradient(rgba(0,255,136,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,255,136,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Noise overlay */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.5;
+}
+
+/* ── NAV ── */
+nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 40px;
+  background: rgba(10,10,15,0.85);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+}
+
+.logo {
+  font-family: 'Syne', sans-serif;
+  font-weight: 800;
+  font-size: 1.1rem;
+  color: var(--accent);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.nav-pills {
+  display: flex;
+  gap: 6px;
+}
+
+.nav-pill {
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 0.7rem;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.2s;
+  background: transparent;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 0.05em;
+}
+
+.nav-pill:hover, .nav-pill.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(0,255,136,0.05);
+  box-shadow: var(--glow);
+}
+
+/* ── HERO ── */
+.hero {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 120px 40px 80px;
+}
+
+.hero-tag {
+  display: inline-block;
+  font-size: 0.7rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 1px solid rgba(0,255,136,0.3);
+  padding: 6px 16px;
+  border-radius: 20px;
+  margin-bottom: 32px;
+  animation: fadeSlideDown 0.8s ease both;
+}
+
+h1 {
+  font-family: 'Syne', sans-serif;
+  font-size: clamp(3rem, 10vw, 8rem);
+  font-weight: 800;
+  line-height: 0.9;
+  margin-bottom: 24px;
+  animation: fadeSlideDown 0.8s 0.1s ease both;
+}
+
+h1 span.green { color: var(--accent); }
+h1 span.orange { color: var(--accent2); }
+
+.hero-sub {
+  font-size: 0.9rem;
+  color: var(--muted);
+  max-width: 500px;
+  line-height: 1.8;
+  margin-bottom: 48px;
+  animation: fadeSlideDown 0.8s 0.2s ease both;
+}
+
+.hero-cta {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+  animation: fadeSlideDown 0.8s 0.3s ease both;
+}
+
+.btn-primary {
+  padding: 14px 32px;
+  background: var(--accent);
+  color: #000;
+  border: none;
+  border-radius: 4px;
+  font-family: 'Syne', sans-serif;
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(0,255,136,0.4);
+}
+
+.btn-secondary {
+  padding: 14px 32px;
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+  border-color: var(--accent3);
+  color: var(--accent3);
+}
+
+/* Orbiting badges */
+.orbit-ring {
+  position: absolute;
+  width: 500px;
+  height: 500px;
+  border: 1px dashed rgba(0,255,136,0.1);
+  border-radius: 50%;
+  animation: spin 20s linear infinite;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.orbit-ring2 {
+  width: 700px;
+  height: 700px;
+  animation-duration: 30s;
+  animation-direction: reverse;
+  border-color: rgba(123,97,255,0.07);
+}
+
+.orbit-dot {
+  position: absolute;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  top: -4px; left: calc(50% - 4px);
+  box-shadow: var(--glow);
+}
+
+.orbit-dot2 {
+  background: var(--accent3);
+  box-shadow: 0 0 20px rgba(123,97,255,0.5);
+  top: calc(50% - 4px);
+  left: -4px;
+}
+
+/* ── SECTION COMMON ── */
+section {
+  position: relative;
+  z-index: 1;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 80px 40px;
+}
+
+.section-label {
+  font-size: 0.65rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.section-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--accent), transparent);
+  max-width: 80px;
+}
+
+h2 {
+  font-family: 'Syne', sans-serif;
+  font-size: clamp(1.8rem, 4vw, 3rem);
+  font-weight: 800;
+  margin-bottom: 48px;
+  line-height: 1.1;
+}
+
+/* ── ROLES GRID ── */
+.roles-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin-bottom: 64px;
+}
+
+.role-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 28px;
+  cursor: pointer;
+  transition: all 0.3s;
+  position: relative;
+  overflow: hidden;
+}
+
+.role-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--card-accent, var(--accent));
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.3s;
+}
+
+.role-card:hover::before, .role-card.active::before { transform: scaleX(1); }
+
+.role-card:hover, .role-card.active {
+  border-color: var(--card-accent, var(--accent));
+  transform: translateY(-4px);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+}
+
+.role-icon {
+  font-size: 2rem;
+  margin-bottom: 16px;
+}
+
+.role-title {
+  font-family: 'Syne', sans-serif;
+  font-weight: 700;
+  font-size: 1rem;
+  margin-bottom: 8px;
+  color: var(--card-accent, var(--accent));
+}
+
+.role-desc {
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.role-example {
+  display: inline-block;
+  margin-top: 12px;
+  font-size: 0.65rem;
+  padding: 3px 10px;
+  border-radius: 20px;
+  border: 1px solid currentColor;
+  color: var(--card-accent, var(--accent));
+  opacity: 0.7;
+}
+
+/* ── FLOW ANIMATOR ── */
+.flow-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 40px;
+  margin-bottom: 64px;
+}
+
+.flow-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 32px;
+}
+
+.flow-tab {
+  padding: 8px 20px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--muted);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.05em;
+}
+
+.flow-tab:hover { border-color: var(--muted); color: var(--text); }
+.flow-tab.active {
+  background: var(--accent);
+  color: #000;
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+.flow-diagram {
+  display: none;
+}
+.flow-diagram.active { display: block; }
+
+.flow-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.flow-step {
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  gap: 16px;
+  align-items: start;
+  padding: 0 0 24px 0;
+  position: relative;
+  opacity: 0;
+  transform: translateX(-10px);
+  transition: all 0.4s ease;
+}
+
+.flow-step.visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.step-num {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: rgba(0,255,136,0.1);
+  border: 1px solid var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  color: var(--accent);
+  font-weight: 600;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.flow-step:not(:last-child) .step-num::after {
+  content: '';
+  position: absolute;
+  top: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 1px;
+  height: calc(100% + 16px);
+  background: linear-gradient(to bottom, var(--accent), transparent);
+  z-index: 0;
+}
+
+.step-content {
+  padding-top: 4px;
+}
+
+.step-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 4px;
+  font-family: 'Syne', sans-serif;
+}
+
+.step-detail {
+  font-size: 0.72rem;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.step-code {
+  margin-top: 10px;
+  background: #0d0d14;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px 16px;
+  font-size: 0.68rem;
+  color: var(--accent4);
+  overflow-x: auto;
+  white-space: pre;
+  line-height: 1.6;
+}
+
+/* ── TOKENS ── */
+.token-section {
+  margin-bottom: 64px;
+}
+
+.jwt-visualizer {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 40px;
+}
+
+.jwt-string {
+  font-size: 0.72rem;
+  word-break: break-all;
+  line-height: 1.8;
+  margin-bottom: 32px;
+  letter-spacing: 0.02em;
+}
+
+.jwt-part { cursor: pointer; transition: all 0.2s; border-radius: 2px; padding: 2px 0; }
+.jwt-part:hover { filter: brightness(1.3); }
+.jwt-header { color: #ff6b6b; }
+.jwt-payload { color: var(--accent); }
+.jwt-sig { color: var(--accent3); }
+.jwt-dot { color: var(--muted); }
+
+.jwt-legend {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.jwt-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.7rem;
+  cursor: pointer;
+  padding: 6px 12px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.jwt-legend-item:hover { border-color: var(--border); }
+.jwt-legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+.jwt-decoded {
+  display: none;
+  background: #0d0d14;
+  border-radius: 8px;
+  padding: 24px;
+  margin-top: 16px;
+  border-left: 3px solid var(--accent);
+  animation: fadeIn 0.3s ease;
+}
+
+.jwt-decoded.visible { display: block; }
+
+.jwt-decoded pre {
+  font-size: 0.72rem;
+  line-height: 1.8;
+  color: var(--accent4);
+  white-space: pre-wrap;
+}
+
+/* ── GRANT TYPES ── */
+.grants-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.grant-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 28px;
+  transition: all 0.3s;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.grant-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at top left, var(--gc, transparent) 0%, transparent 70%);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.grant-card:hover::after { opacity: 0.05; }
+.grant-card:hover {
+  border-color: var(--gc, var(--accent));
+  transform: translateY(-3px);
+}
+
+.grant-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 4px 12px;
+  border-radius: 20px;
+  margin-bottom: 16px;
+  font-weight: 600;
+}
+
+.grant-name {
+  font-family: 'Syne', sans-serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.grant-desc {
+  font-size: 0.75rem;
+  color: var(--muted);
+  line-height: 1.7;
+  margin-bottom: 16px;
+}
+
+.grant-use {
+  font-size: 0.68rem;
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.use-tag {
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.05);
+  font-size: 0.65rem;
+}
+
+/* ── SECURITY CHECKLIST ── */
+.security-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.security-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.security-item:hover { border-color: var(--si-color, var(--accent)); }
+
+.security-icon {
+  font-size: 1.2rem;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.security-text strong {
+  display: block;
+  font-family: 'Syne', sans-serif;
+  font-size: 0.82rem;
+  margin-bottom: 4px;
+  color: var(--si-color, var(--text));
+}
+
+.security-text p {
+  font-size: 0.72rem;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+/* ── SPRING CODE BLOCK ── */
+.code-showcase {
+  background: #0a0a10;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.code-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  background: #0d0d18;
+  border-bottom: 1px solid var(--border);
+}
+
+.code-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.code-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+}
+
+.code-filename {
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+.copy-btn {
+  font-size: 0.65rem;
+  color: var(--muted);
+  background: none;
+  border: 1px solid var(--border);
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: 'JetBrains Mono', monospace;
+  transition: all 0.2s;
+}
+
+.copy-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+.code-tabs-bar {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+}
+
+.code-tab {
+  padding: 10px 20px;
+  font-size: 0.7rem;
+  color: var(--muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.code-tab:hover { color: var(--text); }
+.code-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+.code-panel {
+  display: none;
+  padding: 28px;
+  overflow-x: auto;
+}
+
+.code-panel.active { display: block; }
+
+.code-panel pre {
+  font-size: 0.72rem;
+  line-height: 1.8;
+  white-space: pre;
+  color: #c9d1d9;
+}
+
+.kw { color: #ff79c6; }
+.an { color: #50fa7b; }
+.st { color: #f1fa8c; }
+.cm { color: #6272a4; }
+.tp { color: #8be9fd; }
+.me { color: #ffb86c; }
+.nu { color: #bd93f9; }
+
+/* ── DECISION TREE ── */
+.decision-tree {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 40px;
+  text-align: center;
+}
+
+.dt-question {
+  background: rgba(0,255,136,0.05);
+  border: 1px solid rgba(0,255,136,0.2);
+  border-radius: 8px;
+  padding: 14px 24px;
+  display: inline-block;
+  font-size: 0.82rem;
+  color: var(--accent);
+  margin-bottom: 24px;
+  font-family: 'Syne', sans-serif;
+  font-weight: 700;
+}
+
+.dt-row {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.dt-option {
+  flex: 1;
+  min-width: 200px;
+  max-width: 280px;
+  background: #0d0d18;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+  text-align: left;
+  position: relative;
+  transition: all 0.3s;
+  cursor: pointer;
+}
+
+.dt-option:hover {
+  border-color: var(--dt-color, var(--accent));
+  transform: translateY(-2px);
+}
+
+.dt-cond {
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--dt-color, var(--accent));
+  margin-bottom: 8px;
+}
+
+.dt-result {
+  font-family: 'Syne', sans-serif;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.dt-explain {
+  font-size: 0.68rem;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+/* ── ANIMATIONS ── */
+@keyframes fadeSlideDown {
+  from { opacity: 0; transform: translateY(-20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes spin {
+  from { transform: translate(-50%,-50%) rotate(0deg); }
+  to { transform: translate(-50%,-50%) rotate(360deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.animate-in {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+.animate-in.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Divider */
+.divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border), transparent);
+  margin: 0 40px;
+}
+
+/* Comparison table */
+.compare-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+}
+
+.compare-table th {
+  font-family: 'Syne', sans-serif;
+  font-weight: 700;
+  text-align: left;
+  padding: 14px 16px;
+  border-bottom: 2px solid var(--accent);
+  color: var(--accent);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.compare-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  vertical-align: top;
+  line-height: 1.6;
+}
+
+.compare-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+.compare-table .check { color: var(--accent); }
+.compare-table .cross { color: var(--accent2); }
+
+/* Sticky section nav */
+.section-indicator {
+  position: fixed;
+  right: 24px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.si-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--border);
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.si-dot.active {
+  background: var(--accent);
+  box-shadow: var(--glow);
+  transform: scale(1.5);
+}
+
+/* scroll sections */
+.scroll-section {
+  scroll-margin-top: 80px;
+}
+
+/* Footer */
+footer {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  padding: 60px 40px;
+  border-top: 1px solid var(--border);
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+footer span { color: var(--accent); }
+
+@media (max-width: 768px) {
+  nav { padding: 14px 20px; }
+  .nav-pills { display: none; }
+  section { padding: 60px 20px; }
+  .security-grid { grid-template-columns: 1fr; }
+  .orbit-ring { display: none; }
+  .section-indicator { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="logo">OAuth<span style="color:var(--accent2)">2</span> // Guide</div>
+  <div class="nav-pills">
+    <button class="nav-pill active" onclick="scrollTo('roles')">Roles</button>
+    <button class="nav-pill" onclick="scrollTo('flows')">Flows</button>
+    <button class="nav-pill" onclick="scrollTo('tokens')">Tokens</button>
+    <button class="nav-pill" onclick="scrollTo('grants')">Grants</button>
+    <button class="nav-pill" onclick="scrollTo('spring')">Spring</button>
+    <button class="nav-pill" onclick="scrollTo('security')">Security</button>
+  </div>
+</nav>
+
+<!-- Section indicator -->
+<div class="section-indicator" id="sectionNav">
+  <div class="si-dot active" onclick="scrollTo('hero')" title="Hero"></div>
+  <div class="si-dot" onclick="scrollTo('roles')" title="Roles"></div>
+  <div class="si-dot" onclick="scrollTo('flows')" title="Flows"></div>
+  <div class="si-dot" onclick="scrollTo('tokens')" title="Tokens"></div>
+  <div class="si-dot" onclick="scrollTo('grants')" title="Grants"></div>
+  <div class="si-dot" onclick="scrollTo('spring')" title="Spring Boot"></div>
+  <div class="si-dot" onclick="scrollTo('security')" title="Security"></div>
+</div>
+
+<!-- HERO -->
+<div class="hero" id="hero">
+  <div class="orbit-ring">
+    <div class="orbit-dot"></div>
+  </div>
+  <div class="orbit-ring orbit-ring2">
+    <div class="orbit-dot orbit-dot2"></div>
+  </div>
+
+  <div class="hero-tag">RFC 6749 · Interactive Guide for Senior Devs</div>
+  <h1>
+    <span class="green">OAuth</span><br>
+    <span class="orange">Two</span>
+  </h1>
+  <p class="hero-sub">
+    Authorization framework that lets third-party apps access protected resources —
+    without ever touching credentials. Deep-dive: flows, tokens, Spring Boot integration.
+  </p>
+  <div class="hero-cta">
+    <button class="btn-primary" onclick="scrollTo('flows')">Explore Flows →</button>
+    <button class="btn-secondary" onclick="scrollTo('grants')">Grant Types</button>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ROLES -->
+<section class="scroll-section" id="roles">
+  <div class="animate-in">
+    <div class="section-label">01 // Core Concepts</div>
+    <h2>The Four<br>Actors</h2>
+  </div>
+
+  <div class="roles-grid animate-in">
+    <div class="role-card" style="--card-accent:#ff6b6b">
+      <div class="role-icon">👤</div>
+      <div class="role-title">Resource Owner</div>
+      <div class="role-desc">The human user who owns the data and grants access permissions. They authenticate with the Authorization Server and decide what the Client can access.</div>
+      <div class="role-example">e.g. End User / You</div>
+    </div>
+    <div class="role-card" style="--card-accent:#00ff88">
+      <div class="role-icon">📱</div>
+      <div class="role-title">Client</div>
+      <div class="role-desc">The application requesting access. Could be your Spring Boot app, SPA, or mobile app. It requests tokens and uses them to access resources on behalf of the owner.</div>
+      <div class="role-example">e.g. Your Web App</div>
+    </div>
+    <div class="role-card" style="--card-accent:#7b61ff">
+      <div class="role-icon">🔐</div>
+      <div class="role-title">Authorization Server</div>
+      <div class="role-desc">Issues access tokens after authenticating the Resource Owner and obtaining authorization. It's the trust anchor of the entire OAuth2 ecosystem.</div>
+      <div class="role-example">e.g. Keycloak, Auth0, Okta</div>
+    </div>
+    <div class="role-card" style="--card-accent:#00d4ff">
+      <div class="role-icon">🗄️</div>
+      <div class="role-title">Resource Server</div>
+      <div class="role-desc">Hosts the protected API endpoints. Validates access tokens on every request and enforces scope-based access control. Your REST API is typically here.</div>
+      <div class="role-example">e.g. Your REST API</div>
+    </div>
+  </div>
+
+  <div class="animate-in">
+    <div class="section-label" style="margin-bottom:8px">⚠️ Critical Distinction</div>
+    <div style="background:rgba(255,107,53,0.07);border:1px solid rgba(255,107,53,0.3);border-radius:8px;padding:20px 24px;font-size:0.78rem;line-height:1.8;color:#ffb4a0;">
+      <strong style="font-family:'Syne',sans-serif;color:var(--accent2);">OAuth2 ≠ Authentication.</strong>
+      OAuth2 is an <em>authorization</em> protocol — it grants access, not identity. For authentication (login), you need
+      <strong>OpenID Connect (OIDC)</strong>, which is built on top of OAuth2 and adds an ID Token + <code>/userinfo</code> endpoint.
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- FLOWS -->
+<section class="scroll-section" id="flows">
+  <div class="animate-in">
+    <div class="section-label">02 // Authorization Flows</div>
+    <h2>Step-by-Step<br>Flows</h2>
+  </div>
+
+  <div class="flow-section animate-in">
+    <div class="flow-tabs">
+      <button class="flow-tab active" onclick="showFlow('authcode')">Auth Code</button>
+      <button class="flow-tab" onclick="showFlow('pkce')">Auth Code + PKCE</button>
+      <button class="flow-tab" onclick="showFlow('client')">Client Credentials</button>
+      <button class="flow-tab" onclick="showFlow('device')">Device Code</button>
+    </div>
+
+    <!-- Auth Code -->
+    <div class="flow-diagram active" id="flow-authcode">
+      <div style="margin-bottom:20px;font-size:0.75rem;color:var(--muted);line-height:1.7;">
+        <strong style="color:var(--accent)">Best for: </strong>Traditional web apps with a secure backend server (Spring Boot MVC, etc.)
+      </div>
+      <div class="flow-steps" id="steps-authcode">
+        <div class="flow-step visible">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <div class="step-label">User triggers login</div>
+            <div class="step-detail">User clicks "Login" — Client redirects browser to Authorization Server with required params.</div>
+            <div class="step-code">GET /authorize?
+  response_type=code
+  &client_id=my-app
+  &redirect_uri=https://app.com/callback
+  &scope=openid profile email
+  &state=random_csrf_token</div>
+          </div>
+        </div>
+        <div class="flow-step visible" style="transition-delay:0.1s">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <div class="step-label">User authenticates & consents</div>
+            <div class="step-detail">Auth Server presents login page. User enters credentials, grants requested scopes.</div>
+          </div>
+        </div>
+        <div class="flow-step visible" style="transition-delay:0.2s">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <div class="step-label">Auth Server returns code</div>
+            <div class="step-detail">Redirects browser back to <code>redirect_uri</code> with a short-lived authorization code.</div>
+            <div class="step-code">GET /callback?code=SplxlOBeZQQYbYS6WxSbIA&state=random_csrf_token</div>
+          </div>
+        </div>
+        <div class="flow-step visible" style="transition-delay:0.3s">
+          <div class="step-num">4</div>
+          <div class="step-content">
+            <div class="step-label">Client exchanges code for tokens</div>
+            <div class="step-detail">Server-to-server POST — client_secret never exposed to browser. Returns access + refresh tokens.</div>
+            <div class="step-code">POST /token
+  grant_type=authorization_code
+  &code=SplxlOBeZQQYbYS6WxSbIA
+  &client_id=my-app
+  &client_secret=super-secret
+  &redirect_uri=https://app.com/callback</div>
+          </div>
+        </div>
+        <div class="flow-step visible" style="transition-delay:0.4s">
+          <div class="step-num">5</div>
+          <div class="step-content">
+            <div class="step-label">Access protected resources</div>
+            <div class="step-detail">Client includes access token in every API request as a Bearer token.</div>
+            <div class="step-code">GET /api/orders
+Authorization: Bearer eyJhbGciOiJSUzI1NiJ9...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PKCE -->
+    <div class="flow-diagram" id="flow-pkce">
+      <div style="margin-bottom:20px;font-size:0.75rem;color:var(--muted);line-height:1.7;">
+        <strong style="color:var(--accent)">Best for: </strong>SPAs, Mobile apps — cannot safely store a <code>client_secret</code>. PKCE replaces it cryptographically.
+      </div>
+      <div class="flow-steps">
+        <div class="flow-step visible">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <div class="step-label">Generate PKCE pair</div>
+            <div class="step-detail">Client generates a cryptographically random <code>code_verifier</code> and derives the <code>code_challenge</code>.</div>
+            <div class="step-code">// In your SPA/mobile app:
+code_verifier = random(43..128 chars)
+code_challenge = BASE64URL(SHA256(code_verifier))</div>
+          </div>
+        </div>
+        <div class="flow-step visible" style="transition-delay:0.1s">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <div class="step-label">Send challenge with auth request</div>
+            <div class="step-detail">Include <code>code_challenge</code> and method in the initial redirect. The verifier stays secret client-side.</div>
+            <div class="step-code">GET /authorize?
+  response_type=code
+  &client_id=spa-app
+  &code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK...
+  &code_challenge_method=S256
+  &scope=openid profile</div>
+          </div>
+        </div>
+        <div class="flow-step visible" style="transition-delay:0.2s">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <div class="step-label">Exchange code with verifier (no secret!)</div>
+            <div class="step-detail">Auth Server verifies: <code>SHA256(code_verifier) === code_challenge</code>. No client secret needed.</div>
+            <div class="step-code">POST /token
+  grant_type=authorization_code
+  &code=SplxlOBeZQQYbYS6WxSbIA
+  &client_id=spa-app
+  &code_verifier=dBjftJeZ4CVP-mB92K27uhbUJU1p...
+  // ↑ No client_secret!</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Client Credentials -->
+    <div class="flow-diagram" id="flow-client">
+      <div style="margin-bottom:20px;font-size:0.75rem;color:var(--muted);line-height:1.7;">
+        <strong style="color:var(--accent)">Best for: </strong>Microservice-to-microservice communication. No user involved — machine identity only.
+      </div>
+      <div class="flow-steps">
+        <div class="flow-step visible">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <div class="step-label">Service requests token directly</div>
+            <div class="step-detail">No user redirection. Service authenticates itself with its own credentials.</div>
+            <div class="step-code">POST /token
+  grant_type=client_credentials
+  &client_id=order-service
+  &client_secret=svc-secret-xyz
+  &scope=inventory:read payments:write</div>
+          </div>
+        </div>
+        <div class="flow-step visible" style="transition-delay:0.1s">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <div class="step-label">Auth Server returns access token</div>
+            <div class="step-detail">No refresh token issued — services just re-request tokens when they expire.</div>
+            <div class="step-code">// Response:
+{
+  "access_token": "eyJhbGci...",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "scope": "inventory:read payments:write"
+}</div>
+          </div>
+        </div>
+        <div class="flow-step visible" style="transition-delay:0.2s">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <div class="step-label">Call target microservice</div>
+            <div class="step-detail">Token carries service identity and scopes. Target service validates and checks scopes.</div>
+            <div class="step-code">GET /api/inventory/123
+Authorization: Bearer eyJhbGci...
+// Target validates token, checks SCOPE_inventory:read</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Device Code -->
+    <div class="flow-diagram" id="flow-device">
+      <div style="margin-bottom:20px;font-size:0.75rem;color:var(--muted);line-height:1.7;">
+        <strong style="color:var(--accent)">Best for: </strong>Smart TVs, CLI tools, IoT devices — no browser/keyboard available.
+      </div>
+      <div class="flow-steps">
+        <div class="flow-step visible">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <div class="step-label">Device requests a code</div>
+            <div class="step-detail">Device POSTs to the device authorization endpoint to get a user code and verification URL.</div>
+            <div class="step-code">POST /device/code
+  client_id=tv-app&scope=openid profile
+// Returns:
+{  "device_code": "GmRhmhcxhwAzkoEqiMEg_DnyEysNkuNhszIySk9eS",
+   "user_code": "WDJB-MJHT",
+   "verification_uri": "https://auth.com/activate",
+   "expires_in": 900,
+   "interval": 5  }</div>
+          </div>
+        </div>
+        <div class="flow-step visible" style="transition-delay:0.1s">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <div class="step-label">User visits URL on another device</div>
+            <div class="step-detail">TV displays: "Visit <strong>auth.com/activate</strong> and enter code <strong>WDJB-MJHT</strong>". User does this on phone/laptop.</div>
+          </div>
+        </div>
+        <div class="flow-step visible" style="transition-delay:0.2s">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <div class="step-label">Device polls for token</div>
+            <div class="step-detail">Meanwhile, device polls the token endpoint every 5 seconds until user completes auth.</div>
+            <div class="step-code">POST /token
+  grant_type=urn:ietf:params:oauth:grant-type:device_code
+  &device_code=GmRhmhcxhwAzkoEqiMEg_DnyEysNkuNhszIySk9eS
+  &client_id=tv-app
+// Receives: authorization_pending → keep polling → success!</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- TOKENS -->
+<section class="scroll-section" id="tokens">
+  <div class="animate-in">
+    <div class="section-label">03 // JWT Tokens</div>
+    <h2>Anatomy of<br>a Token</h2>
+  </div>
+
+  <div class="jwt-visualizer animate-in">
+    <div style="font-size:0.7rem;color:var(--muted);margin-bottom:16px;">Click a section to decode it →</div>
+
+    <div class="jwt-string">
+      <span class="jwt-part jwt-header" onclick="showDecoded('header')">eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9</span><span class="jwt-dot">.</span><span class="jwt-part jwt-payload" onclick="showDecoded('payload')">eyJzdWIiOiJ1c2VyXzEyMyIsImlzcyI6Imh0dHBzOi8vYXV0aC5leGFtcGxlLmNvbSIsImF1ZCI6Im15LWFwaSIsImV4cCI6MTcwMDAwMDAwMCwiaWF0IjoxNjk5OTk2NDAwLCJyb2xlcyI6WyJVU0VSIiwiQURNSU4iXSwic2NvcGUiOiJyZWFkIHdyaXRlIn0</span><span class="jwt-dot">.</span><span class="jwt-part jwt-sig" onclick="showDecoded('sig')">SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c</span>
+    </div>
+
+    <div class="jwt-legend">
+      <div class="jwt-legend-item" onclick="showDecoded('header')">
+        <div class="jwt-legend-dot" style="background:#ff6b6b"></div>
+        <span style="color:#ff6b6b">Header</span>
+      </div>
+      <div class="jwt-legend-item" onclick="showDecoded('payload')">
+        <div class="jwt-legend-dot" style="background:var(--accent)"></div>
+        <span style="color:var(--accent)">Payload (Claims)</span>
+      </div>
+      <div class="jwt-legend-item" onclick="showDecoded('sig')">
+        <div class="jwt-legend-dot" style="background:var(--accent3)"></div>
+        <span style="color:var(--accent3)">Signature</span>
+      </div>
+    </div>
+
+    <div class="jwt-decoded" id="decoded-header">
+      <div style="font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;color:#ff6b6b;margin-bottom:12px;">// Header — Algorithm & Type</div>
+      <pre>{
+  "alg": "RS256",   <span style="color:var(--muted)">// RS256 = RSA + SHA256 (asymmetric, preferred in prod)</span>
+  "typ": "JWT"      <span style="color:var(--muted)">// Token type</span>
+}</pre>
+    </div>
+
+    <div class="jwt-decoded" id="decoded-payload">
+      <div style="font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent);margin-bottom:12px;">// Payload — Claims (not encrypted, base64url encoded)</div>
+      <pre>{
+  "sub": "user_123",              <span style="color:var(--muted)">// Subject — unique user identifier</span>
+  "iss": "https://auth.example.com", <span style="color:var(--muted)">// Issuer — who issued this token</span>
+  "aud": "my-api",                <span style="color:var(--muted)">// Audience — intended recipient</span>
+  "exp": 1700000000,              <span style="color:var(--muted)">// Expiry (Unix epoch) — ALWAYS validate!</span>
+  "iat": 1699996400,              <span style="color:var(--muted)">// Issued At</span>
+  "roles": ["USER", "ADMIN"],    <span style="color:var(--muted)">// Custom claim — your roles</span>
+  "scope": "read write"           <span style="color:var(--muted)">// OAuth2 scopes granted</span>
+}</pre>
+    </div>
+
+    <div class="jwt-decoded" id="decoded-sig">
+      <div style="font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent3);margin-bottom:12px;">// Signature — Tamper Detection</div>
+      <pre><span style="color:var(--accent3)">RSASHA256(</span>
+  base64url(header) + "." + base64url(payload),
+  <span style="color:var(--muted)">// Signed with Auth Server's PRIVATE key</span>
+  <span style="color:var(--muted)">// Verified with Auth Server's PUBLIC key (JWKS endpoint)</span>
+  <span style="color:#ff6b6b)">privateKey</span>
+<span style="color:var(--accent3)">)</span>
+
+<span style="color:var(--muted)">// Your Resource Server fetches the public key from:
+// /.well-known/jwks.json
+// Spring Security does this automatically via issuer-uri!</span></pre>
+    </div>
+  </div>
+
+  <!-- Token comparison -->
+  <div style="margin-top:32px" class="animate-in">
+    <h3 style="font-family:'Syne',sans-serif;font-size:1.2rem;margin-bottom:20px;">Token Types at a Glance</h3>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
+      <table class="compare-table">
+        <thead>
+          <tr>
+            <th>Token</th>
+            <th>Purpose</th>
+            <th>Lifespan</th>
+            <th>Storage</th>
+            <th>Refreshable?</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="color:var(--accent);font-weight:600">Access Token</td>
+            <td>Call protected APIs</td>
+            <td>5–60 min</td>
+            <td>Memory / HttpOnly cookie</td>
+            <td class="check">✓ via Refresh Token</td>
+          </tr>
+          <tr>
+            <td style="color:var(--accent3);font-weight:600">Refresh Token</td>
+            <td>Obtain new access tokens</td>
+            <td>Days–weeks</td>
+            <td>HttpOnly cookie only</td>
+            <td class="cross">✗ (rotate on use)</td>
+          </tr>
+          <tr>
+            <td style="color:#ff6b6b;font-weight:600">ID Token (OIDC)</td>
+            <td>User identity info</td>
+            <td>Same as access</td>
+            <td>Memory only</td>
+            <td class="cross">✗</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- GRANTS -->
+<section class="scroll-section" id="grants">
+  <div class="animate-in">
+    <div class="section-label">04 // Grant Types</div>
+    <h2>Choose Your<br>Flow</h2>
+  </div>
+
+  <div class="grants-grid animate-in">
+    <div class="grant-card" style="--gc:#00ff88">
+      <div class="grant-badge" style="background:rgba(0,255,136,0.1);color:var(--accent)">
+        🔐 Recommended
+      </div>
+      <div class="grant-name">Authorization Code</div>
+      <div class="grant-desc">The gold standard for web apps with a backend. The <code>client_secret</code> stays server-side, never touching the browser.</div>
+      <div class="grant-use">Use for: <span class="use-tag">Spring Boot</span> <span class="use-tag">SSR Apps</span> <span class="use-tag">Node.js</span></div>
+    </div>
+    <div class="grant-card" style="--gc:#00d4ff">
+      <div class="grant-badge" style="background:rgba(0,212,255,0.1);color:var(--accent4)">
+        🛡️ + PKCE Required
+      </div>
+      <div class="grant-name">Auth Code + PKCE</div>
+      <div class="grant-desc">Same as Auth Code but replaces <code>client_secret</code> with a cryptographic proof. Mandatory for any public client.</div>
+      <div class="grant-use">Use for: <span class="use-tag">React SPA</span> <span class="use-tag">Angular</span> <span class="use-tag">Mobile</span></div>
+    </div>
+    <div class="grant-card" style="--gc:#7b61ff">
+      <div class="grant-badge" style="background:rgba(123,97,255,0.1);color:var(--accent3)">
+        ⚙️ Machine-to-Machine
+      </div>
+      <div class="grant-name">Client Credentials</div>
+      <div class="grant-desc">No user involved. A service authenticates with its own identity. Perfect for microservice communication in your Spring ecosystem.</div>
+      <div class="grant-use">Use for: <span class="use-tag">Microservices</span> <span class="use-tag">Daemons</span> <span class="use-tag">CI/CD</span></div>
+    </div>
+    <div class="grant-card" style="--gc:#ff6b35">
+      <div class="grant-badge" style="background:rgba(255,107,53,0.1);color:var(--accent2)">
+        📺 Limited Input Devices
+      </div>
+      <div class="grant-name">Device Code</div>
+      <div class="grant-desc">Designed for devices that can't open a browser. User completes auth on a secondary device while the primary polls for the token.</div>
+      <div class="grant-use">Use for: <span class="use-tag">Smart TV</span> <span class="use-tag">CLI</span> <span class="use-tag">IoT</span></div>
+    </div>
+    <div class="grant-card" style="--gc:#ff4444;opacity:0.6">
+      <div class="grant-badge" style="background:rgba(255,68,68,0.1);color:#ff6b6b">
+        ⛔ Deprecated
+      </div>
+      <div class="grant-name">Password Grant</div>
+      <div class="grant-desc">Client collects username/password directly. Completely defeats the purpose of OAuth2. Removed in OAuth 2.1. Never use.</div>
+      <div class="grant-use" style="color:#ff4444">AVOID AT ALL COSTS</div>
+    </div>
+    <div class="grant-card" style="--gc:#ffd700">
+      <div class="grant-badge" style="background:rgba(255,215,0,0.1);color:#ffd700">
+        🔄 Token Refresh
+      </div>
+      <div class="grant-name">Refresh Token Grant</div>
+      <div class="grant-desc">Not a standalone flow — used to silently obtain a new access token when the current one expires, without re-prompting the user.</div>
+      <div class="grant-use">Use for: <span class="use-tag">Token renewal</span> <span class="use-tag">Long sessions</span></div>
+    </div>
+  </div>
+
+  <!-- Decision tree -->
+  <div class="decision-tree animate-in">
+    <div style="font-size:0.65rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);margin-bottom:24px;">Flow Selector</div>
+    <div class="dt-question">Is a user (human) involved?</div>
+    <div class="dt-row">
+      <div class="dt-option" style="--dt-color:#7b61ff">
+        <div class="dt-cond">NO →</div>
+        <div class="dt-result">Client Credentials</div>
+        <div class="dt-explain">Machine-to-machine. Service authenticates with its own client_id + client_secret.</div>
+      </div>
+      <div class="dt-option" style="--dt-color:var(--accent)">
+        <div class="dt-cond">YES → Does the app have a secure backend?</div>
+        <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">
+          <div style="flex:1;min-width:120px;background:#0d0d18;border:1px solid var(--border);border-radius:6px;padding:12px">
+            <div style="font-size:0.6rem;color:var(--accent);margin-bottom:4px">YES →</div>
+            <div style="font-family:'Syne',sans-serif;font-size:0.8rem;font-weight:700">Auth Code Flow</div>
+          </div>
+          <div style="flex:1;min-width:120px;background:#0d0d18;border:1px solid var(--border);border-radius:6px;padding:12px">
+            <div style="font-size:0.6rem;color:var(--accent4);margin-bottom:4px">NO (SPA/Mobile) →</div>
+            <div style="font-family:'Syne',sans-serif;font-size:0.8rem;font-weight:700">Auth Code + PKCE</div>
+          </div>
+        </div>
+      </div>
+      <div class="dt-option" style="--dt-color:#ff6b35">
+        <div class="dt-cond">NO BROWSER →</div>
+        <div class="dt-result">Device Code Flow</div>
+        <div class="dt-explain">CLI, Smart TV, IoT. User authorizes on a secondary device.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- SPRING BOOT -->
+<section class="scroll-section" id="spring">
+  <div class="animate-in">
+    <div class="section-label">05 // Spring Boot Integration</div>
+    <h2>Production-Ready<br>Config</h2>
+  </div>
+
+  <div class="code-showcase animate-in">
+    <div class="code-header">
+      <div class="code-dots">
+        <div class="code-dot" style="background:#ff5f57"></div>
+        <div class="code-dot" style="background:#febc2e"></div>
+        <div class="code-dot" style="background:#28c840"></div>
+      </div>
+      <div class="code-filename">Spring Boot 3.x · OAuth2 Integration</div>
+      <button class="copy-btn" onclick="copyCode()">copy</button>
+    </div>
+    <div class="code-tabs-bar">
+      <div class="code-tab active" onclick="showCodeTab('security')">SecurityConfig.java</div>
+      <div class="code-tab" onclick="showCodeTab('yaml')">application.yml</div>
+      <div class="code-tab" onclick="showCodeTab('controller')">OrderController.java</div>
+      <div class="code-tab" onclick="showCodeTab('client')">RestClient (M2M)</div>
+    </div>
+
+    <div class="code-panel active" id="code-security">
+      <pre><span class="an">@Configuration</span>
+<span class="an">@EnableWebSecurity</span>
+<span class="an">@EnableMethodSecurity</span>
+<span class="kw">public class</span> <span class="tp">SecurityConfig</span> {
+
+    <span class="an">@Bean</span>
+    <span class="kw">public</span> <span class="tp">SecurityFilterChain</span> <span class="me">filterChain</span>(<span class="tp">HttpSecurity</span> http) <span class="kw">throws</span> <span class="tp">Exception</span> {
+        http
+            .<span class="me">csrf</span>(<span class="tp">AbstractHttpConfigurer</span>::<span class="me">disable</span>) <span class="cm">// Stateless API</span>
+            .<span class="me">sessionManagement</span>(s -> s
+                .<span class="me">sessionCreationPolicy</span>(<span class="tp">SessionCreationPolicy</span>.STATELESS))
+            .<span class="me">authorizeHttpRequests</span>(auth -> auth
+                .<span class="me">requestMatchers</span>(<span class="st">"/actuator/health"</span>, <span class="st">"/public/**"</span>).<span class="me">permitAll</span>()
+                .<span class="me">requestMatchers</span>(<span class="st">"/admin/**"</span>).<span class="me">hasRole</span>(<span class="st">"ADMIN"</span>)
+                .<span class="me">requestMatchers</span>(<span class="st">"/api/orders"</span>).<span class="me">hasAuthority</span>(<span class="st">"SCOPE_read:orders"</span>)
+                .<span class="me">anyRequest</span>().<span class="me">authenticated</span>()
+            )
+            .<span class="me">oauth2ResourceServer</span>(oauth2 -> oauth2
+                .<span class="me">jwt</span>(jwt -> jwt
+                    .<span class="me">jwtAuthenticationConverter</span>(<span class="me">jwtAuthConverter</span>())
+                )
+            );
+        <span class="kw">return</span> http.<span class="me">build</span>();
+    }
+
+    <span class="an">@Bean</span>
+    <span class="kw">public</span> <span class="tp">JwtAuthenticationConverter</span> <span class="me">jwtAuthConverter</span>() {
+        <span class="kw">var</span> rolesConverter = <span class="kw">new</span> <span class="tp">JwtGrantedAuthoritiesConverter</span>();
+        rolesConverter.<span class="me">setAuthoritiesClaimName</span>(<span class="st">"roles"</span>); <span class="cm">// custom claim name</span>
+        rolesConverter.<span class="me">setAuthorityPrefix</span>(<span class="st">"ROLE_"</span>);
+
+        <span class="kw">var</span> converter = <span class="kw">new</span> <span class="tp">JwtAuthenticationConverter</span>();
+        converter.<span class="me">setJwtGrantedAuthoritiesConverter</span>(rolesConverter);
+        <span class="kw">return</span> converter;
+    }
+}</pre>
+    </div>
+
+    <div class="code-panel" id="code-yaml">
+      <pre><span class="kw">spring:</span>
+  <span class="kw">security:</span>
+    <span class="kw">oauth2:</span>
+      <span class="cm"># Resource Server (validate incoming JWTs)</span>
+      <span class="kw">resourceserver:</span>
+        <span class="kw">jwt:</span>
+          <span class="kw">issuer-uri:</span> <span class="st">https://keycloak.company.com/realms/prod</span>
+          <span class="cm"># Spring auto-fetches JWKS from /.well-known/openid-configuration</span>
+
+      <span class="cm"># OAuth2 Client (for SSO login or outgoing calls)</span>
+      <span class="kw">client:</span>
+        <span class="kw">registration:</span>
+          <span class="kw">keycloak:</span>
+            <span class="kw">client-id:</span> <span class="st">my-spring-app</span>
+            <span class="kw">client-secret:</span> <span class="st">${KEYCLOAK_CLIENT_SECRET}</span>
+            <span class="kw">scope:</span> <span class="st">openid, profile, email, roles</span>
+            <span class="kw">authorization-grant-type:</span> <span class="st">authorization_code</span>
+
+          <span class="cm"># Machine-to-machine: order-service → inventory-service</span>
+          <span class="kw">order-to-inventory:</span>
+            <span class="kw">client-id:</span> <span class="st">order-service</span>
+            <span class="kw">client-secret:</span> <span class="st">${ORDER_SERVICE_SECRET}</span>
+            <span class="kw">authorization-grant-type:</span> <span class="st">client_credentials</span>
+            <span class="kw">scope:</span> <span class="st">inventory:read</span>
+
+        <span class="kw">provider:</span>
+          <span class="kw">keycloak:</span>
+            <span class="kw">issuer-uri:</span> <span class="st">https://keycloak.company.com/realms/prod</span>
+
+<span class="cm"># Logging for debugging (disable in prod)</span>
+<span class="kw">logging:</span>
+  <span class="kw">level:</span>
+    <span class="kw">org.springframework.security:</span> <span class="st">DEBUG</span></pre>
+    </div>
+
+    <div class="code-panel" id="code-controller">
+      <pre><span class="an">@RestController</span>
+<span class="an">@RequestMapping</span>(<span class="st">"/api/orders"</span>)
+<span class="kw">public class</span> <span class="tp">OrderController</span> {
+
+    <span class="cm">// Method-level security via @PreAuthorize</span>
+    <span class="an">@GetMapping</span>
+    <span class="an">@PreAuthorize</span>(<span class="st">"hasAuthority('SCOPE_read:orders')"</span>)
+    <span class="kw">public</span> <span class="tp">List</span>&lt;<span class="tp">Order</span>&gt; <span class="me">getOrders</span>(<span class="an">@AuthenticationPrincipal</span> <span class="tp">Jwt</span> jwt) {
+        <span class="kw">var</span> userId = jwt.<span class="me">getSubject</span>();      <span class="cm">// "sub" claim</span>
+        <span class="kw">var</span> email = jwt.<span class="me">getClaimAsString</span>(<span class="st">"email"</span>);
+        <span class="kw">var</span> roles = jwt.<span class="me">getClaimAsStringList</span>(<span class="st">"roles"</span>);
+
+        <span class="kw">return</span> orderService.<span class="me">findByUserId</span>(userId);
+    }
+
+    <span class="an">@PostMapping</span>
+    <span class="an">@PreAuthorize</span>(<span class="st">"hasRole('USER') and hasAuthority('SCOPE_write:orders')"</span>)
+    <span class="kw">public</span> <span class="tp">Order</span> <span class="me">createOrder</span>(
+            <span class="an">@RequestBody</span> <span class="tp">CreateOrderRequest</span> req,
+            <span class="an">@AuthenticationPrincipal</span> <span class="tp">Jwt</span> jwt) {
+        <span class="kw">return</span> orderService.<span class="me">create</span>(req, jwt.<span class="me">getSubject</span>());
+    }
+
+    <span class="cm">// Admin only</span>
+    <span class="an">@DeleteMapping</span>(<span class="st">"/{id}"</span>)
+    <span class="an">@PreAuthorize</span>(<span class="st">"hasRole('ADMIN')"</span>)
+    <span class="kw">public void</span> <span class="me">deleteOrder</span>(<span class="an">@PathVariable</span> <span class="tp">Long</span> id) {
+        orderService.<span class="me">delete</span>(id);
+    }
+}</pre>
+    </div>
+
+    <div class="code-panel" id="code-client">
+      <pre><span class="cm">/**
+ * Token-propagating WebClient for microservice-to-microservice calls.
+ * Uses Client Credentials flow — order-service calls inventory-service.
+ */</span>
+<span class="an">@Configuration</span>
+<span class="kw">public class</span> <span class="tp">WebClientConfig</span> {
+
+    <span class="an">@Bean</span>
+    <span class="kw">public</span> <span class="tp">WebClient</span> <span class="me">inventoryClient</span>(
+            <span class="tp">OAuth2AuthorizedClientManager</span> authorizedClientManager) {
+
+        <span class="kw">var</span> interceptor = <span class="kw">new</span> <span class="tp">ServletOAuth2AuthorizedClientExchangeFilterFunction</span>(
+                authorizedClientManager);
+
+        <span class="cm">// Use 'order-to-inventory' registration from application.yml</span>
+        interceptor.<span class="me">setDefaultClientRegistrationId</span>(<span class="st">"order-to-inventory"</span>);
+
+        <span class="kw">return</span> <span class="tp">WebClient</span>.<span class="me">builder</span>()
+                .<span class="me">baseUrl</span>(<span class="st">"https://inventory-service.internal"</span>)
+                .<span class="me">apply</span>(interceptor.<span class="me">oauth2Configuration</span>())
+                .<span class="me">build</span>();
+    }
+}
+
+<span class="cm">// Usage in OrderService:</span>
+<span class="an">@Service</span>
+<span class="kw">public class</span> <span class="tp">OrderService</span> {
+
+    <span class="kw">private final</span> <span class="tp">WebClient</span> inventoryClient;
+
+    <span class="kw">public</span> <span class="tp">StockLevel</span> <span class="me">checkStock</span>(<span class="tp">String</span> productId) {
+        <span class="kw">return</span> inventoryClient.<span class="me">get</span>()
+                .<span class="me">uri</span>(<span class="st">"/stock/{id}"</span>, productId)
+                .<span class="me">retrieve</span>()
+                .<span class="me">bodyToMono</span>(<span class="tp">StockLevel</span>.<span class="kw">class</span>)
+                .<span class="me">block</span>();
+        <span class="cm">// Token auto-fetched + cached by Spring Security!</span>
+    }
+}</pre>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- SECURITY -->
+<section class="scroll-section" id="security">
+  <div class="animate-in">
+    <div class="section-label">06 // Security Hardening</div>
+    <h2>What To Do<br>& What Not To</h2>
+  </div>
+
+  <div class="security-grid animate-in">
+    <div class="security-item" style="--si-color:var(--accent)">
+      <div class="security-icon">✅</div>
+      <div class="security-text">
+        <strong>Short-lived access tokens</strong>
+        <p>Keep access tokens to 5–60 minutes. Limits blast radius if stolen. Use refresh tokens for seamless renewal.</p>
+      </div>
+    </div>
+    <div class="security-item" style="--si-color:#ff4444">
+      <div class="security-icon">❌</div>
+      <div class="security-text">
+        <strong>Never store tokens in localStorage</strong>
+        <p>XSS attacks can steal localStorage. Use HttpOnly + Secure + SameSite=Strict cookies for token storage.</p>
+      </div>
+    </div>
+    <div class="security-item" style="--si-color:var(--accent)">
+      <div class="security-icon">✅</div>
+      <div class="security-text">
+        <strong>Always use HTTPS</strong>
+        <p>Tokens are Bearer credentials. A token over HTTP = your credentials in plaintext. Non-negotiable.</p>
+      </div>
+    </div>
+    <div class="security-item" style="--si-color:#ff4444">
+      <div class="security-icon">❌</div>
+      <div class="security-text">
+        <strong>Never expose client_secret in frontend</strong>
+        <p>SPAs and mobile apps cannot keep secrets. Use PKCE instead — it provides the same protection cryptographically.</p>
+      </div>
+    </div>
+    <div class="security-item" style="--si-color:var(--accent)">
+      <div class="security-icon">✅</div>
+      <div class="security-text">
+        <strong>Validate all JWT claims</strong>
+        <p>Always verify: <code>iss</code> (issuer), <code>aud</code> (audience), <code>exp</code> (expiry), <code>nbf</code> (not before). Spring does this automatically.</p>
+      </div>
+    </div>
+    <div class="security-item" style="--si-color:#ff4444">
+      <div class="security-icon">❌</div>
+      <div class="security-text">
+        <strong>Don't use Password Grant</strong>
+        <p>It forces users to give their credentials to your app, bypassing the Auth Server. Removed in OAuth 2.1 for good reason.</p>
+      </div>
+    </div>
+    <div class="security-item" style="--si-color:var(--accent)">
+      <div class="security-icon">✅</div>
+      <div class="security-text">
+        <strong>Rotate refresh tokens</strong>
+        <p>Issue a new refresh token on every use (Refresh Token Rotation). Enables detection of token theft via reuse detection.</p>
+      </div>
+    </div>
+    <div class="security-item" style="--si-color:var(--accent)">
+      <div class="security-icon">✅</div>
+      <div class="security-text">
+        <strong>Use state parameter (CSRF protection)</strong>
+        <p>Generate a random <code>state</code> param on redirect. Verify it on callback. Prevents CSRF attacks on your OAuth flow.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- OIDC vs OAuth comparison -->
+  <div style="margin-top:48px" class="animate-in">
+    <h3 style="font-family:'Syne',sans-serif;font-size:1.2rem;margin-bottom:20px;">OAuth2 vs OpenID Connect (OIDC)</h3>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
+      <table class="compare-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th>OAuth2</th>
+            <th>OpenID Connect (OIDC)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="color:var(--muted)">Purpose</td>
+            <td>Authorization (access control)</td>
+            <td>Authentication (identity)</td>
+          </tr>
+          <tr>
+            <td style="color:var(--muted)">Tokens</td>
+            <td>Access Token, Refresh Token</td>
+            <td>+ <strong>ID Token</strong> (contains user info)</td>
+          </tr>
+          <tr>
+            <td style="color:var(--muted)">User Info</td>
+            <td class="cross">No standard</td>
+            <td class="check"><code>/userinfo</code> endpoint</td>
+          </tr>
+          <tr>
+            <td style="color:var(--muted)">Required Scope</td>
+            <td>Custom scopes</td>
+            <td>Must include <code>openid</code></td>
+          </tr>
+          <tr>
+            <td style="color:var(--muted)">Answers</td>
+            <td>"What can this app do?"</td>
+            <td>"Who is this user?"</td>
+          </tr>
+          <tr>
+            <td style="color:var(--muted)">Spring Support</td>
+            <td><code>oauth2ResourceServer</code></td>
+            <td><code>oauth2Login</code> + <code>OidcUser</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.5rem;margin-bottom:12px;">OAuth<span>2</span></div>
+  <div>RFC 6749 · Built for Senior Java Engineers · Spring Boot 3.x</div>
+  <div style="margin-top:8px;font-size:0.65rem">Access Token · Refresh Token · Authorization Code · PKCE · Client Credentials · JWT</div>
+</footer>
+
+<script>
+// Smooth scroll
+function scrollTo(id) {
+  const el = document.getElementById(id);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// Flow tabs
+function showFlow(name) {
+  document.querySelectorAll('.flow-diagram').forEach(d => d.classList.remove('active'));
+  document.querySelectorAll('.flow-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('flow-' + name).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// JWT decoded panels
+function showDecoded(part) {
+  document.querySelectorAll('.jwt-decoded').forEach(d => d.classList.remove('visible'));
+  document.getElementById('decoded-' + part).classList.add('visible');
+}
+
+// Code tabs
+function showCodeTab(name) {
+  document.querySelectorAll('.code-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.code-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('code-' + name).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// Copy code
+function copyCode() {
+  const panel = document.querySelector('.code-panel.active pre');
+  navigator.clipboard.writeText(panel.innerText).then(() => {
+    const btn = document.querySelector('.copy-btn');
+    btn.textContent = 'copied!';
+    btn.style.color = 'var(--accent)';
+    setTimeout(() => { btn.textContent = 'copy'; btn.style.color = ''; }, 2000);
+  });
+}
+
+// Intersection Observer for animations
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+    }
+  });
+}, { threshold: 0.1 });
+
+document.querySelectorAll('.animate-in').forEach(el => observer.observe(el));
+
+// Section nav indicator
+const sections = ['hero', 'roles', 'flows', 'tokens', 'grants', 'spring', 'security'];
+const dots = document.querySelectorAll('.si-dot');
+const navPills = document.querySelectorAll('.nav-pill');
+
+const sectionObserver = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      const idx = sections.indexOf(entry.target.id);
+      dots.forEach((d, i) => d.classList.toggle('active', i === idx));
+      if (idx > 0) {
+        navPills.forEach((p, i) => p.classList.toggle('active', i === idx - 1));
+      }
+    }
+  });
+}, { threshold: 0.5 });
+
+sections.forEach(id => {
+  const el = document.getElementById(id);
+  if (el) sectionObserver.observe(el);
+});
+
+// Trigger flow steps animation on tab switch
+function animateSteps(diagramId) {
+  const steps = document.querySelectorAll(`#${diagramId} .flow-step`);
+  steps.forEach((s, i) => {
+    s.classList.remove('visible');
+    setTimeout(() => s.classList.add('visible'), i * 120);
+  });
+}
+
+// Override showFlow to also animate
+const origShowFlow = showFlow;
+window.showFlow = function(name) {
+  document.querySelectorAll('.flow-diagram').forEach(d => d.classList.remove('active'));
+  document.querySelectorAll('.flow-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('flow-' + name).classList.add('active');
+  event.target.classList.add('active');
+  animateSteps('flow-' + name);
+};
+</script>
+</body>
+</html>
