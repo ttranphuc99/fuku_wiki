@@ -1,0 +1,2493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenID Connect — Interactive Deep Dive</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --cream: #f5f0e8;
+  --parchment: #ede8dc;
+  --ink: #1a1614;
+  --ink-light: #2e2825;
+  --muted: #7a6f63;
+  --copper: #b5651d;
+  --copper-light: #d4813a;
+  --gold: #c9a84c;
+  --navy: #1b2a4a;
+  --navy-light: #2d4270;
+  --rust: #9b3922;
+  --sage: #4a6741;
+  --border: #d4c9b8;
+  --border-dark: #b8a99a;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--cream);
+  color: var(--ink);
+  font-family: 'DM Sans', sans-serif;
+  overflow-x: hidden;
+  cursor: default;
+}
+
+/* Blueprint grid overlay */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(180,160,130,0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(180,160,130,0.08) 1px, transparent 1px);
+  background-size: 60px 60px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Paper texture */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='400' height='400' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 0;
+  opacity: 1;
+}
+
+/* ── NAV ── */
+nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 48px;
+  height: 64px;
+  background: rgba(245,240,232,0.92);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+}
+
+.logo {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--navy);
+  letter-spacing: 0.02em;
+}
+
+.logo em {
+  font-style: italic;
+  color: var(--copper);
+}
+
+.nav-links {
+  display: flex;
+  gap: 0;
+  list-style: none;
+}
+
+.nav-links li a {
+  display: block;
+  padding: 8px 16px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.2s;
+  border-bottom: 2px solid transparent;
+}
+
+.nav-links li a:hover,
+.nav-links li a.active {
+  color: var(--copper);
+  border-bottom-color: var(--copper);
+}
+
+/* ── HERO ── */
+.hero {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  padding: 100px 0 80px;
+  max-width: 1300px;
+  margin: 0 auto;
+  padding-left: 64px;
+  padding-right: 64px;
+  gap: 80px;
+}
+
+.hero-left { }
+
+.hero-issue {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.65rem;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--copper);
+  margin-bottom: 28px;
+  font-weight: 500;
+}
+
+.hero-issue::before {
+  content: '';
+  width: 24px;
+  height: 1px;
+  background: var(--copper);
+}
+
+h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(3.5rem, 6vw, 6.5rem);
+  font-weight: 900;
+  line-height: 0.92;
+  color: var(--navy);
+  margin-bottom: 8px;
+  animation: fadeUp 0.9s ease both;
+}
+
+h1 em {
+  font-style: italic;
+  color: var(--copper);
+  display: block;
+}
+
+.hero-subtitle {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.05rem;
+  font-weight: 700;
+  font-style: italic;
+  color: var(--muted);
+  margin-bottom: 28px;
+  letter-spacing: 0.01em;
+  animation: fadeUp 0.9s 0.1s ease both;
+}
+
+.hero-desc {
+  font-size: 0.88rem;
+  color: var(--muted);
+  line-height: 1.85;
+  max-width: 420px;
+  margin-bottom: 40px;
+  font-weight: 300;
+  animation: fadeUp 0.9s 0.2s ease both;
+}
+
+.hero-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  animation: fadeUp 0.9s 0.3s ease both;
+}
+
+.hero-tag {
+  padding: 6px 14px;
+  border: 1px solid var(--border-dark);
+  border-radius: 2px;
+  font-size: 0.68rem;
+  font-family: 'DM Mono', monospace;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-decoration: none;
+}
+
+.hero-tag:hover {
+  border-color: var(--copper);
+  color: var(--copper);
+  background: rgba(181,101,29,0.04);
+}
+
+/* Hero right — the identity card visual */
+.hero-right {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  animation: fadeUp 0.9s 0.2s ease both;
+}
+
+.id-card {
+  background: var(--navy);
+  border-radius: 12px;
+  padding: 32px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(27,42,74,0.25);
+}
+
+.id-card::before {
+  content: '';
+  position: absolute;
+  top: -40px; right: -40px;
+  width: 160px; height: 160px;
+  border-radius: 50%;
+  border: 40px solid rgba(201,168,76,0.08);
+}
+
+.id-card::after {
+  content: 'IDENTITY TOKEN';
+  position: absolute;
+  top: 16px; right: 20px;
+  font-size: 0.55rem;
+  letter-spacing: 0.2em;
+  color: rgba(255,255,255,0.2);
+  font-family: 'DM Mono', monospace;
+}
+
+.id-card-chip {
+  width: 36px; height: 28px;
+  background: linear-gradient(135deg, var(--gold) 0%, #a07830 100%);
+  border-radius: 4px;
+  margin-bottom: 24px;
+  position: relative;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+.id-card-chip::after {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 2px;
+}
+
+.id-card-name {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  color: rgba(255,255,255,0.4);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.id-card-value {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 20px;
+}
+
+.id-card-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+.id-field-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.55rem;
+  letter-spacing: 0.12em;
+  color: rgba(255,255,255,0.35);
+  text-transform: uppercase;
+  margin-bottom: 3px;
+}
+
+.id-field-value {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  color: rgba(255,255,255,0.8);
+}
+
+.id-field-value.gold { color: var(--gold); }
+.id-field-value.green { color: #4ade80; }
+
+/* Comparison badges */
+.compare-badges {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.compare-badge {
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.compare-badge.oidc {
+  background: rgba(27,42,74,0.06);
+  border-color: var(--navy-light);
+}
+
+.compare-badge.oauth {
+  background: rgba(155,57,34,0.05);
+  border-color: rgba(155,57,34,0.3);
+}
+
+.badge-label {
+  font-size: 0.6rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.badge-label.oidc { color: var(--navy); }
+.badge-label.oauth { color: var(--rust); }
+
+.badge-text {
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-family: 'Playfair Display', serif;
+  margin-bottom: 4px;
+}
+
+.badge-sub { font-size: 0.68rem; color: var(--muted); }
+
+/* ── SECTION COMMON ── */
+section {
+  position: relative;
+  z-index: 1;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 96px 64px;
+}
+
+.section-number {
+  font-family: 'Playfair Display', serif;
+  font-size: 5rem;
+  font-weight: 900;
+  font-style: italic;
+  color: rgba(181,101,29,0.1);
+  line-height: 1;
+  margin-bottom: -16px;
+  display: block;
+}
+
+.section-label-text {
+  font-size: 0.65rem;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--copper);
+  font-weight: 600;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.section-label-text::before {
+  content: '';
+  width: 32px;
+  height: 1px;
+  background: var(--copper);
+}
+
+h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(2rem, 4vw, 3.5rem);
+  font-weight: 900;
+  color: var(--navy);
+  line-height: 1.05;
+  margin-bottom: 16px;
+}
+
+h2 em { font-style: italic; color: var(--copper); }
+
+.section-intro {
+  font-size: 0.88rem;
+  color: var(--muted);
+  max-width: 600px;
+  line-height: 1.85;
+  margin-bottom: 56px;
+  font-weight: 300;
+}
+
+/* Full-width horizontal rule */
+.hr-fancy {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 0 64px;
+  margin: 0 auto;
+  max-width: 1200px;
+}
+
+.hr-fancy::before, .hr-fancy::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.hr-diamond {
+  width: 8px; height: 8px;
+  background: var(--copper);
+  transform: rotate(45deg);
+  flex-shrink: 0;
+}
+
+/* ── HOW OIDC WORKS ── */
+.flow-container {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: 40px;
+  align-items: start;
+}
+
+.flow-steps-list { }
+
+.flow-step-item {
+  display: flex;
+  gap: 24px;
+  padding-bottom: 32px;
+  position: relative;
+  opacity: 0;
+  transform: translateX(-16px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+.flow-step-item.visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.flow-step-item:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 19px;
+  top: 44px;
+  bottom: 0;
+  width: 1px;
+  background: linear-gradient(to bottom, var(--border-dark), var(--border));
+}
+
+.step-circle {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: var(--navy);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Playfair Display', serif;
+  font-size: 0.9rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.step-circle.copper {
+  background: var(--copper);
+}
+
+.step-body {
+  padding-top: 8px;
+  flex: 1;
+}
+
+.step-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--navy);
+  margin-bottom: 6px;
+}
+
+.step-desc {
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.75;
+  margin-bottom: 12px;
+  font-weight: 300;
+}
+
+.step-code-block {
+  background: var(--ink);
+  border-radius: 6px;
+  padding: 14px 18px;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.67rem;
+  color: #c8d3e0;
+  line-height: 1.7;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+/* Flow sidebar - live token preview */
+.flow-sidebar {
+  position: sticky;
+  top: 90px;
+}
+
+.sidebar-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 4px 24px rgba(27,42,74,0.08);
+  margin-bottom: 16px;
+}
+
+.sidebar-card-header {
+  padding: 14px 20px;
+  background: var(--navy);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  color: rgba(255,255,255,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sidebar-card-header .dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--gold);
+}
+
+.sidebar-card-body {
+  padding: 18px 20px;
+}
+
+.token-tab-bar {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  margin: 0 -20px;
+  padding: 0 20px;
+  margin-bottom: 16px;
+}
+
+.token-tab {
+  padding: 8px 14px;
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  font-family: 'DM Mono', monospace;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  transition: all 0.2s;
+  margin-bottom: -1px;
+}
+
+.token-tab:hover { color: var(--navy); }
+.token-tab.active {
+  color: var(--copper);
+  border-bottom-color: var(--copper);
+}
+
+.token-panel { display: none; }
+.token-panel.active { display: block; }
+
+.claim-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+  font-family: 'DM Mono', monospace;
+}
+
+.claim-key {
+  font-size: 0.65rem;
+  color: var(--copper);
+  min-width: 80px;
+  flex-shrink: 0;
+  font-style: italic;
+}
+
+.claim-val {
+  font-size: 0.65rem;
+  color: var(--navy);
+}
+
+.claim-note {
+  font-size: 0.6rem;
+  color: var(--muted);
+  margin-left: auto;
+}
+
+/* ── CLAIMS ── */
+.claims-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.claim-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 22px 24px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s;
+  cursor: default;
+}
+
+.claim-card::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--cc-color, var(--navy));
+  transform: scaleY(0);
+  transform-origin: bottom;
+  transition: transform 0.3s;
+}
+
+.claim-card:hover::before { transform: scaleY(1); }
+.claim-card:hover {
+  box-shadow: 0 8px 32px rgba(27,42,74,0.1);
+  transform: translateY(-2px);
+}
+
+.claim-card-type {
+  font-size: 0.58rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--cc-color, var(--muted));
+  font-weight: 600;
+  margin-bottom: 10px;
+  font-family: 'DM Mono', monospace;
+}
+
+.claim-card-name {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+
+.claim-card-desc {
+  font-size: 0.75rem;
+  color: var(--muted);
+  line-height: 1.7;
+  font-weight: 300;
+}
+
+.claim-example {
+  margin-top: 10px;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--navy-light);
+  background: rgba(27,42,74,0.04);
+  padding: 4px 8px;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+/* ── ID TOKEN ANATOMY ── */
+.token-anatomy {
+  background: var(--navy);
+  border-radius: 12px;
+  padding: 40px;
+  position: relative;
+  overflow: hidden;
+}
+
+.token-anatomy::before {
+  content: 'ID TOKEN';
+  position: absolute;
+  top: 20px; right: 24px;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.55rem;
+  letter-spacing: 0.2em;
+  color: rgba(255,255,255,0.15);
+}
+
+.ta-intro {
+  font-size: 0.75rem;
+  color: rgba(255,255,255,0.45);
+  font-family: 'DM Mono', monospace;
+  margin-bottom: 24px;
+}
+
+.ta-string {
+  word-break: break-all;
+  line-height: 2.2;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.72rem;
+  margin-bottom: 28px;
+  cursor: default;
+}
+
+.ta-part {
+  padding: 3px 0;
+  border-radius: 2px;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.ta-part:hover { filter: brightness(1.4); }
+.ta-header { color: #f9a875; }
+.ta-payload { color: #7ce38b; }
+.ta-sig { color: #74b2ff; }
+.ta-dot { color: rgba(255,255,255,0.3); }
+
+.ta-legend {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.ta-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.68rem;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.ta-legend-item:hover { opacity: 0.8; }
+
+.ta-legend-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+}
+
+.ta-decoded {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  padding: 20px 24px;
+  display: none;
+  animation: fadeIn 0.3s ease;
+}
+
+.ta-decoded.visible { display: block; }
+
+.ta-decoded pre {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  line-height: 1.8;
+  color: rgba(255,255,255,0.7);
+  white-space: pre-wrap;
+}
+
+/* ── SCOPES ── */
+.scopes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.scope-item {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 24px;
+  align-items: start;
+  padding: 20px 24px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  transition: all 0.3s;
+  cursor: pointer;
+}
+
+.scope-item:hover {
+  border-color: var(--copper);
+  box-shadow: 0 4px 20px rgba(181,101,29,0.08);
+}
+
+.scope-name {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--copper);
+  padding-top: 2px;
+}
+
+.scope-body {}
+
+.scope-desc {
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.7;
+  margin-bottom: 10px;
+  font-weight: 300;
+}
+
+.scope-claims {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.scope-claim-tag {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.62rem;
+  padding: 3px 10px;
+  border: 1px solid var(--border-dark);
+  border-radius: 2px;
+  color: var(--muted);
+  background: var(--parchment);
+}
+
+/* ── DISCOVERY ── */
+.discovery-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.discovery-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.discovery-card-header {
+  padding: 16px 20px;
+  background: var(--parchment);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.discovery-card-header .icon {
+  font-size: 1.1rem;
+}
+
+.discovery-card-header .title {
+  font-family: 'Playfair Display', serif;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.discovery-card-body {
+  padding: 20px;
+}
+
+.endpoint-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+}
+
+.endpoint-path {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.68rem;
+  color: var(--copper);
+}
+
+.endpoint-desc {
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-weight: 300;
+}
+
+/* ── SPRING CODE ── */
+.code-book {
+  background: var(--ink);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(27,42,74,0.2);
+}
+
+.code-book-spine {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px;
+  background: var(--ink-light);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.spine-dots { display: flex; gap: 6px; }
+.spine-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+}
+
+.spine-title {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  color: rgba(255,255,255,0.4);
+  letter-spacing: 0.05em;
+}
+
+.code-book-tabs {
+  display: flex;
+  background: rgba(255,255,255,0.02);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  overflow-x: auto;
+}
+
+.cb-tab {
+  padding: 11px 20px;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.68rem;
+  color: rgba(255,255,255,0.3);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  white-space: nowrap;
+  background: none;
+  border-left: none;
+  border-top: none;
+  border-right: none;
+}
+
+.cb-tab:hover { color: rgba(255,255,255,0.6); }
+.cb-tab.active {
+  color: var(--gold);
+  border-bottom-color: var(--gold);
+  background: rgba(201,168,76,0.04);
+}
+
+.cb-panel { display: none; padding: 28px 32px; overflow-x: auto; }
+.cb-panel.active { display: block; }
+
+.cb-panel pre {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.71rem;
+  line-height: 1.85;
+  color: #cdd9e5;
+  white-space: pre;
+  tab-size: 2;
+}
+
+/* Code syntax */
+.kw { color: #c792ea; }
+.an { color: #80cbc4; }
+.st { color: #c3e88d; }
+.cm { color: #546e7a; font-style: italic; }
+.tp { color: #82aaff; }
+.me { color: #f07178; }
+.nu { color: #f78c6c; }
+.bo { color: #ff9cac; }
+
+.copy-btn {
+  background: none;
+  border: 1px solid rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.3);
+  padding: 4px 12px;
+  border-radius: 3px;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.62rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.05em;
+}
+
+.copy-btn:hover {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+/* ── COMPARISON TABLE ── */
+.comparison-wrapper {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 24px rgba(27,42,74,0.06);
+}
+
+.comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.comparison-table th {
+  font-family: 'Playfair Display', serif;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-align: left;
+  padding: 16px 20px;
+  background: var(--parchment);
+  color: var(--navy);
+  border-bottom: 2px solid var(--border);
+}
+
+.comparison-table th:first-child {
+  color: var(--muted);
+  font-style: italic;
+  font-size: 0.75rem;
+  font-family: 'DM Mono', monospace;
+  font-weight: 400;
+}
+
+.comparison-table td {
+  padding: 13px 20px;
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+  color: var(--ink);
+  vertical-align: top;
+  line-height: 1.6;
+}
+
+.comparison-table td:first-child {
+  color: var(--muted);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.72rem;
+  font-weight: 400;
+}
+
+.comparison-table tr:hover td {
+  background: rgba(181,101,29,0.02);
+}
+
+.check-ico { color: var(--sage); font-weight: 700; }
+.cross-ico { color: var(--rust); }
+
+/* ── SECURITY GRID ── */
+.security-items {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 0;
+}
+
+.sec-item {
+  padding: 22px 24px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #fff;
+  transition: all 0.25s;
+}
+
+.sec-item:hover {
+  border-color: var(--si-color, var(--copper));
+  box-shadow: 0 4px 20px rgba(0,0,0,0.07);
+}
+
+.sec-item-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.sec-icon { font-size: 1.1rem; }
+
+.sec-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--si-color, var(--navy));
+}
+
+.sec-desc {
+  font-size: 0.74rem;
+  color: var(--muted);
+  line-height: 1.7;
+  font-weight: 300;
+}
+
+/* ── ANIMATIONS ── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Section indicator dots */
+.section-nav {
+  position: fixed;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+}
+
+.sn-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--border-dark);
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.sn-dot.active {
+  background: var(--copper);
+  transform: scale(1.8);
+}
+
+/* Footer */
+footer {
+  position: relative;
+  z-index: 1;
+  border-top: 1px solid var(--border);
+  padding: 48px 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 100%;
+}
+
+.footer-logo {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.footer-logo em { color: var(--copper); font-style: italic; }
+
+.footer-text {
+  font-size: 0.68rem;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.6;
+}
+
+.footer-links {
+  display: flex;
+  gap: 20px;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--muted);
+}
+
+.footer-links span { cursor: pointer; transition: color 0.2s; }
+.footer-links span:hover { color: var(--copper); }
+
+@media (max-width: 900px) {
+  .hero { grid-template-columns: 1fr; gap: 40px; padding: 100px 32px 60px; }
+  .hero-right { display: none; }
+  section { padding: 64px 32px; }
+  .flow-container { grid-template-columns: 1fr; }
+  .flow-sidebar { display: none; }
+  .security-items { grid-template-columns: 1fr; }
+  .discovery-grid { grid-template-columns: 1fr; }
+  .section-nav { display: none; }
+  footer { flex-direction: column; gap: 20px; text-align: center; padding: 40px 32px; }
+  .footer-links { justify-content: center; }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="logo">Open<em>ID</em> Connect</div>
+  <ul class="nav-links">
+    <li><a href="#how-it-works" class="active">Flow</a></li>
+    <li><a href="#id-token">ID Token</a></li>
+    <li><a href="#claims">Claims</a></li>
+    <li><a href="#scopes">Scopes</a></li>
+    <li><a href="#spring">Spring Boot</a></li>
+    <li><a href="#security">Security</a></li>
+  </ul>
+</nav>
+
+<!-- Section nav -->
+<div class="section-nav" id="sectionNav">
+  <div class="sn-dot active"></div>
+  <div class="sn-dot"></div>
+  <div class="sn-dot"></div>
+  <div class="sn-dot"></div>
+  <div class="sn-dot"></div>
+  <div class="sn-dot"></div>
+  <div class="sn-dot"></div>
+</div>
+
+<!-- ── HERO ── -->
+<div class="hero" id="hero">
+  <div class="hero-left">
+    <div class="hero-issue">OpenID Connect · RFC Layer on OAuth2</div>
+    <h1>Who<br>Are<br><em>You?</em></h1>
+    <p class="hero-subtitle">Authentication, not just Authorization.</p>
+    <p class="hero-desc">
+      OpenID Connect (OIDC) sits atop OAuth2 and answers the one question
+      OAuth2 couldn't: <strong>who is this user?</strong> It adds an ID Token,
+      a standardized UserInfo endpoint, and a discovery mechanism — transforming
+      OAuth2 from an access-control protocol into a full identity layer.
+    </p>
+    <div class="hero-tags">
+      <a href="#how-it-works" class="hero-tag">Auth Flow</a>
+      <a href="#id-token" class="hero-tag">ID Token</a>
+      <a href="#claims" class="hero-tag">Claims</a>
+      <a href="#scopes" class="hero-tag">Scopes</a>
+      <a href="#spring" class="hero-tag">Spring Boot</a>
+    </div>
+  </div>
+  <div class="hero-right">
+    <!-- ID Card Visual -->
+    <div class="id-card">
+      <div class="id-card-chip"></div>
+      <div class="id-card-name">Subject Identifier</div>
+      <div class="id-card-value">user_1a2b3c4d</div>
+      <div class="id-card-fields">
+        <div>
+          <div class="id-field-label">Email</div>
+          <div class="id-field-value">jane@corp.com</div>
+        </div>
+        <div>
+          <div class="id-field-label">Issuer</div>
+          <div class="id-field-value">auth.corp.com</div>
+        </div>
+        <div>
+          <div class="id-field-label">Issued At</div>
+          <div class="id-field-value gold">2025-03-02</div>
+        </div>
+        <div>
+          <div class="id-field-label">Status</div>
+          <div class="id-field-value green">✓ Verified</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- OAuth vs OIDC -->
+    <div class="compare-badges">
+      <div class="compare-badge oauth">
+        <div class="badge-label oauth">OAuth 2.0</div>
+        <div class="badge-text">Can I access?</div>
+        <div class="badge-sub">Authorization only. No identity.</div>
+      </div>
+      <div class="compare-badge oidc">
+        <div class="badge-label oidc">OIDC</div>
+        <div class="badge-text">Who are you?</div>
+        <div class="badge-sub">Authentication + identity layer.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── HR ── -->
+<div class="hr-fancy" id="how-it-works"><div class="hr-diamond"></div></div>
+
+<!-- ── HOW IT WORKS ── -->
+<section>
+  <div class="reveal">
+    <span class="section-number">01</span>
+    <div class="section-label-text">Authentication Flow</div>
+    <h2>How OIDC <em>Works</em></h2>
+    <p class="section-intro">
+      OIDC extends the OAuth2 Authorization Code flow with one critical addition:
+      alongside the access token, the Authorization Server issues an <strong>ID Token</strong>
+      — a signed JWT containing the user's verified identity.
+    </p>
+  </div>
+
+  <div class="flow-container">
+    <div class="flow-steps-list" id="flowSteps">
+      <div class="flow-step-item">
+        <div class="step-circle">1</div>
+        <div class="step-body">
+          <div class="step-title">Client initiates authentication</div>
+          <div class="step-desc">
+            User clicks "Sign In". Client redirects to the Authorization Server's
+            <code>/authorize</code> endpoint. The critical difference from plain OAuth2:
+            <code>scope</code> must include <code>openid</code>.
+          </div>
+          <div class="step-code-block">GET /authorize?
+  response_type=code
+  &client_id=my-app
+  &redirect_uri=https://app.com/callback
+  &scope=openid profile email    ← openid is mandatory!
+  &state=csrf_token_xyz
+  &nonce=random_replay_prevention_value</div>
+        </div>
+      </div>
+
+      <div class="flow-step-item">
+        <div class="step-circle">2</div>
+        <div class="step-body">
+          <div class="step-title">User authenticates at Authorization Server</div>
+          <div class="step-desc">
+            Auth Server presents a login form. User enters credentials.
+            Auth Server verifies them, establishes a session, and records consent.
+            The <code>nonce</code> from step 1 will be embedded in the ID Token.
+          </div>
+        </div>
+      </div>
+
+      <div class="flow-step-item">
+        <div class="step-circle">3</div>
+        <div class="step-body">
+          <div class="step-title">Auth Server redirects with authorization code</div>
+          <div class="step-desc">
+            Browser is redirected back to your <code>redirect_uri</code> with a short-lived
+            authorization code. State parameter must be validated to prevent CSRF.
+          </div>
+          <div class="step-code-block">GET /callback?
+  code=SplxlOBeZQQYbYS6WxSbIA
+  &state=csrf_token_xyz       ← validate this matches!</div>
+        </div>
+      </div>
+
+      <div class="flow-step-item">
+        <div class="step-circle copper">4</div>
+        <div class="step-body">
+          <div class="step-title">Client exchanges code for tokens (key difference!)</div>
+          <div class="step-desc">
+            Server-to-server token exchange. Auth Server returns <strong>three</strong> things:
+            an <strong>access token</strong>, a <strong>refresh token</strong>, AND — unique to OIDC —
+            an <strong>ID Token</strong>.
+          </div>
+          <div class="step-code-block">POST /token
+  grant_type=authorization_code
+  &code=SplxlOBeZQQYbYS6WxSbIA
+  &client_id=my-app
+  &client_secret=super-secret
+  &redirect_uri=https://app.com/callback
+
+// Response:
+{
+  "access_token":  "eyJhbGci...",   ← for API access
+  "refresh_token": "dGhpcyBp...",   ← for renewal
+  "id_token":      "eyJhbGci...",   ← OIDC identity JWT ✨
+  "token_type":    "Bearer",
+  "expires_in":    3600
+}</div>
+        </div>
+      </div>
+
+      <div class="flow-step-item">
+        <div class="step-circle copper">5</div>
+        <div class="step-body">
+          <div class="step-title">Client validates the ID Token</div>
+          <div class="step-desc">
+            This step is mandatory and critical. Client must validate the ID Token before
+            trusting any identity claims. Failure to validate = security vulnerability.
+          </div>
+          <div class="step-code-block">// Must validate:
+✓ Signature — using Auth Server's public key (JWKS)
+✓ iss claim — must match expected issuer
+✓ aud claim — must match your client_id
+✓ exp claim — must not be expired
+✓ nonce claim — must match what was sent in step 1
+✓ iat claim — must be recent (prevent old token replay)</div>
+        </div>
+      </div>
+
+      <div class="flow-step-item">
+        <div class="step-circle">6</div>
+        <div class="step-body">
+          <div class="step-title">Optionally fetch UserInfo</div>
+          <div class="step-desc">
+            For additional claims not in the ID Token, call the <code>/userinfo</code> endpoint
+            using the access token. Returns a JSON object with the requested profile data.
+          </div>
+          <div class="step-code-block">GET /userinfo
+Authorization: Bearer &lt;access_token&gt;
+
+// Response:
+{
+  "sub":        "user_1a2b3c4d",
+  "name":       "Jane Doe",
+  "email":      "jane@corp.com",
+  "picture":    "https://cdn.example.com/avatar.jpg",
+  "given_name": "Jane",
+  "family_name": "Doe",
+  "locale":     "en-US"
+}</div>
+        </div>
+      </div>
+
+      <div class="flow-step-item">
+        <div class="step-circle">7</div>
+        <div class="step-body">
+          <div class="step-title">Session established — user is authenticated</div>
+          <div class="step-desc">
+            Client establishes a local session based on the validated identity.
+            Use the access token for API calls. Store refresh token securely for session renewal.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="flow-sidebar">
+      <div class="sidebar-card">
+        <div class="sidebar-card-header">
+          Live Token Response <div class="dot"></div>
+        </div>
+        <div class="sidebar-card-body">
+          <div class="token-tab-bar">
+            <div class="token-tab active" onclick="showTokenTab('id', event)">ID Token</div>
+            <div class="token-tab" onclick="showTokenTab('access', event)">Access</div>
+            <div class="token-tab" onclick="showTokenTab('userinfo', event)">UserInfo</div>
+          </div>
+
+          <div class="token-panel active" id="tab-id">
+            <div class="claim-row">
+              <span class="claim-key">sub</span>
+              <span class="claim-val">"user_1a2b3c4d"</span>
+              <span class="claim-note">identity</span>
+            </div>
+            <div class="claim-row">
+              <span class="claim-key">iss</span>
+              <span class="claim-val">"https://auth.corp.com"</span>
+            </div>
+            <div class="claim-row">
+              <span class="claim-key">aud</span>
+              <span class="claim-val">"my-app"</span>
+              <span class="claim-note">validate!</span>
+            </div>
+            <div class="claim-row">
+              <span class="claim-key">exp</span>
+              <span class="claim-val">1740000000</span>
+              <span class="claim-note">validate!</span>
+            </div>
+            <div class="claim-row">
+              <span class="claim-key">iat</span>
+              <span class="claim-val">1739996400</span>
+            </div>
+            <div class="claim-row">
+              <span class="claim-key">nonce</span>
+              <span class="claim-val">"abc123"</span>
+              <span class="claim-note">validate!</span>
+            </div>
+            <div class="claim-row">
+              <span class="claim-key">email</span>
+              <span class="claim-val">"jane@corp.com"</span>
+            </div>
+            <div class="claim-row">
+              <span class="claim-key">name</span>
+              <span class="claim-val">"Jane Doe"</span>
+            </div>
+            <div class="claim-row">
+              <span class="claim-key">roles</span>
+              <span class="claim-val">["USER","ADMIN"]</span>
+            </div>
+          </div>
+
+          <div class="token-panel" id="tab-access">
+            <div class="claim-row">
+              <span class="claim-key">sub</span>
+              <span class="claim-val">"user_1a2b3c4d"</span>
+            </div>
+            <div class="claim-row">
+              <span class="claim-key">scope</span>
+              <span class="claim-val">"openid profile email"</span>
+            </div>
+            <div class="claim-row">
+              <span class="claim-key">exp</span>
+              <span class="claim-val">1740000000</span>
+            </div>
+            <div style="margin-top:14px;font-size:0.68rem;color:var(--muted);font-style:italic;line-height:1.6;">
+              Access Token is used for API calls.<br>
+              Not meant to convey identity — use the ID Token for that.
+            </div>
+          </div>
+
+          <div class="token-panel" id="tab-userinfo">
+            <div class="claim-row">
+              <span class="claim-key">sub</span>
+              <span class="claim-val">"user_1a2b3c4d"</span>
+            </div>
+            <div class="claim-row">
+              <span class="claim-key">name</span>
+              <span class="claim-val">"Jane Doe"</span>
+            </div>
+            <div class="claim-row">
+              <span class="claim-key">email</span>
+              <span class="claim-val">"jane@corp.com"</span>
+            </div>
+            <div class="claim-row">
+              <span class="claim-key">picture</span>
+              <span class="claim-val">"https://cdn…"</span>
+            </div>
+            <div class="claim-row">
+              <span class="claim-key">locale</span>
+              <span class="claim-val">"en-US"</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-card">
+        <div class="sidebar-card-header">
+          OIDC vs OAuth2 at a glance <div class="dot"></div>
+        </div>
+        <div class="sidebar-card-body" style="font-size:0.7rem;line-height:1.8;color:var(--muted);">
+          <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0f0f0">
+            <span style="font-family:'DM Mono',monospace">ID Token</span>
+            <span style="color:var(--sage)">✓ OIDC only</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0f0f0">
+            <span style="font-family:'DM Mono',monospace">Access Token</span>
+            <span>Both</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0f0f0">
+            <span style="font-family:'DM Mono',monospace">/userinfo</span>
+            <span style="color:var(--sage)">✓ OIDC only</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0f0f0">
+            <span style="font-family:'DM Mono',monospace">openid scope</span>
+            <span style="color:var(--sage)">✓ OIDC only</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0f0f0">
+            <span style="font-family:'DM Mono',monospace">nonce param</span>
+            <span style="color:var(--sage)">✓ OIDC only</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:6px 0">
+            <span style="font-family:'DM Mono',monospace">Discovery doc</span>
+            <span style="color:var(--sage)">✓ OIDC only</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="hr-fancy" id="id-token"><div class="hr-diamond"></div></div>
+
+<!-- ── ID TOKEN ANATOMY ── -->
+<section>
+  <div class="reveal">
+    <span class="section-number">02</span>
+    <div class="section-label-text">The Core Artifact</div>
+    <h2>Anatomy of the<br><em>ID Token</em></h2>
+    <p class="section-intro">
+      The ID Token is a signed JWT issued exclusively by OIDC — it's what makes
+      OIDC authentication instead of merely authorization. Click any segment to decode it.
+    </p>
+  </div>
+
+  <div class="token-anatomy reveal">
+    <div class="ta-intro">// ID Token: base64url(header) . base64url(payload) . signature</div>
+
+    <div class="ta-string">
+      <span class="ta-part ta-header" onclick="showTaDecode('header')">eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6Imtl...</span><span class="ta-dot">.</span><span class="ta-part ta-payload" onclick="showTaDecode('payload')">eyJzdWIiOiJ1c2VyXzFhMmIzYzRkIiwiaXNzIjoiaHR0cHM6Ly9hdXRoLmNvcnAuY29tIiwiYXVkIjoibXktYXBwIiwiZXhwIjoxNzQwMDAwMDAwLCJpYXQiOjE3Mzk5OTY0MDAsIm5vbmNlIjoiYWJjMTIzIiwiZW1haWwiOiJqYW5lQGNvcnAuY29tIiwibmFtZSI6IkphbmUgRG9lIn0</span><span class="ta-dot">.</span><span class="ta-part ta-sig" onclick="showTaDecode('sig')">SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c...</span>
+    </div>
+
+    <div class="ta-legend">
+      <div class="ta-legend-item" onclick="showTaDecode('header')">
+        <div class="ta-legend-dot" style="background:#f9a875"></div>
+        <span style="color:#f9a875">Header</span>
+      </div>
+      <div class="ta-legend-item" onclick="showTaDecode('payload')">
+        <div class="ta-legend-dot" style="background:#7ce38b"></div>
+        <span style="color:#7ce38b">Payload / Claims</span>
+      </div>
+      <div class="ta-legend-item" onclick="showTaDecode('sig')">
+        <div class="ta-legend-dot" style="background:#74b2ff"></div>
+        <span style="color:#74b2ff">Signature</span>
+      </div>
+    </div>
+
+    <div class="ta-decoded" id="ta-header">
+      <div style="font-size:0.6rem;color:#f9a875;letter-spacing:0.15em;margin-bottom:12px;text-transform:uppercase;">// Header</div>
+      <pre>{
+  <span style="color:#f9a875">"alg"</span>: <span style="color:#7ce38b">"RS256"</span>,   <span style="color:#546e7a">// Asymmetric RSA+SHA256 — preferred over HS256 in production</span>
+  <span style="color:#f9a875">"typ"</span>: <span style="color:#7ce38b">"JWT"</span>,
+  <span style="color:#f9a875">"kid"</span>: <span style="color:#7ce38b">"key-id-abc"</span>  <span style="color:#546e7a">// Key ID — tells client which public key to verify with (JWKS)</span>
+}</pre>
+    </div>
+
+    <div class="ta-decoded" id="ta-payload">
+      <div style="font-size:0.6rem;color:#7ce38b;letter-spacing:0.15em;margin-bottom:12px;text-transform:uppercase;">// Payload — Identity Claims (base64url encoded, NOT encrypted)</div>
+      <pre>{
+  <span style="color:#f9a875">"sub"</span>:    <span style="color:#7ce38b">"user_1a2b3c4d"</span>,        <span style="color:#546e7a">// ← Subject: stable, unique user ID — use as your primary key</span>
+  <span style="color:#f9a875">"iss"</span>:    <span style="color:#7ce38b">"https://auth.corp.com"</span>, <span style="color:#546e7a">// ← Issuer: MUST validate matches expected server</span>
+  <span style="color:#f9a875">"aud"</span>:    <span style="color:#7ce38b">"my-app"</span>,               <span style="color:#546e7a">// ← Audience: MUST validate matches your client_id</span>
+  <span style="color:#f9a875">"exp"</span>:    <span style="color:#74b2ff">1740000000</span>,             <span style="color:#546e7a">// ← Expiry: MUST validate — reject expired tokens</span>
+  <span style="color:#f9a875">"iat"</span>:    <span style="color:#74b2ff">1739996400</span>,             <span style="color:#546e7a">// ← Issued At: validate for freshness</span>
+  <span style="color:#f9a875">"nonce"</span>:  <span style="color:#7ce38b">"abc123"</span>,               <span style="color:#546e7a">// ← OIDC-specific: prevents token replay attacks</span>
+  <span style="color:#f9a875">"email"</span>:  <span style="color:#7ce38b">"jane@corp.com"</span>,         <span style="color:#546e7a">// ← Profile claims (if email scope requested)</span>
+  <span style="color:#f9a875">"name"</span>:   <span style="color:#7ce38b">"Jane Doe"</span>,
+  <span style="color:#f9a875">"roles"</span>:  [<span style="color:#7ce38b">"USER"</span>, <span style="color:#7ce38b">"ADMIN"</span>],    <span style="color:#546e7a">// ← Custom claim from your Auth Server</span>
+  <span style="color:#f9a875">"azp"</span>:    <span style="color:#7ce38b">"my-app"</span>                <span style="color:#546e7a">// ← Authorized party (when aud has multiple values)</span>
+}</pre>
+    </div>
+
+    <div class="ta-decoded" id="ta-sig">
+      <div style="font-size:0.6rem;color:#74b2ff;letter-spacing:0.15em;margin-bottom:12px;text-transform:uppercase;">// Signature — Integrity & Authenticity Proof</div>
+      <pre><span style="color:#74b2ff">RSASHA256(</span>
+  base64url(header) <span style="color:#546e7a">+</span> <span style="color:#7ce38b">"."</span> <span style="color:#546e7a">+</span> base64url(payload),
+  authServer.<span style="color:#f9a875">privateKey</span>  <span style="color:#546e7a">// Auth Server signs with its RSA private key</span>
+<span style="color:#74b2ff">)</span>
+
+<span style="color:#546e7a">// Your client verifies using the Auth Server's PUBLIC key:</span>
+<span style="color:#546e7a">// Fetch from: GET /.well-known/jwks.json</span>
+<span style="color:#546e7a">// Spring Security handles this automatically via issuer-uri config!</span>
+
+<span style="color:#546e7a">// ⚠️  The ID Token payload is NOT encrypted — it's only signed.</span>
+<span style="color:#546e7a">// Never put sensitive secrets in claims. Use JWE (JSON Web Encryption)</span>
+<span style="color:#546e7a">// if you need encrypted payloads.</span></pre>
+    </div>
+  </div>
+</section>
+
+<div class="hr-fancy" id="claims"><div class="hr-diamond"></div></div>
+
+<!-- ── CLAIMS ── -->
+<section>
+  <div class="reveal">
+    <span class="section-number">03</span>
+    <div class="section-label-text">Standard Identity Claims</div>
+    <h2>The Claims<br><em>Catalogue</em></h2>
+    <p class="section-intro">
+      OIDC defines a standard set of claims for user identity. Hover any card to learn its purpose.
+      These are returned in the ID Token and/or from the <code>/userinfo</code> endpoint.
+    </p>
+  </div>
+
+  <div class="claims-grid reveal">
+    <div class="claim-card" style="--cc-color:var(--rust)">
+      <div class="claim-card-type">mandatory</div>
+      <div class="claim-card-name">sub</div>
+      <div class="claim-card-desc">Subject — the unique, stable identifier for the user at this issuer. Use this as your primary key in your database, never email (emails change).</div>
+      <div class="claim-example">"user_1a2b3c4d"</div>
+    </div>
+    <div class="claim-card" style="--cc-color:var(--rust)">
+      <div class="claim-card-type">mandatory</div>
+      <div class="claim-card-name">iss</div>
+      <div class="claim-card-desc">Issuer — URL of the Authorization Server that issued this token. Always validate this against your expected issuer URL.</div>
+      <div class="claim-example">"https://auth.corp.com"</div>
+    </div>
+    <div class="claim-card" style="--cc-color:var(--rust)">
+      <div class="claim-card-type">mandatory</div>
+      <div class="claim-card-name">aud</div>
+      <div class="claim-card-desc">Audience — who this token is intended for. Must match your client_id. Reject tokens where you're not in the audience.</div>
+      <div class="claim-example">"my-spring-app"</div>
+    </div>
+    <div class="claim-card" style="--cc-color:var(--rust)">
+      <div class="claim-card-type">mandatory</div>
+      <div class="claim-card-name">exp / iat</div>
+      <div class="claim-card-desc">Expiry and Issued At — Unix timestamps. Always validate exp. Use iat to detect stale tokens and iat + leeway for clock skew tolerance.</div>
+      <div class="claim-example">exp: 1740000000</div>
+    </div>
+    <div class="claim-card" style="--cc-color:var(--navy)">
+      <div class="claim-card-type">profile scope</div>
+      <div class="claim-card-name">name</div>
+      <div class="claim-card-desc">Full display name of the user. May be a combination of given_name + family_name, or a custom display name.</div>
+      <div class="claim-example">"Jane Doe"</div>
+    </div>
+    <div class="claim-card" style="--cc-color:var(--navy)">
+      <div class="claim-card-type">profile scope</div>
+      <div class="claim-card-name">given_name / family_name</div>
+      <div class="claim-card-desc">First and last name components. Use these for personalization within your application UI.</div>
+      <div class="claim-example">"Jane" / "Doe"</div>
+    </div>
+    <div class="claim-card" style="--cc-color:var(--copper)">
+      <div class="claim-card-type">email scope</div>
+      <div class="claim-card-name">email</div>
+      <div class="claim-card-desc">User's email address. Never use as a unique key — use sub instead. Always check email_verified before trusting it.</div>
+      <div class="claim-example">"jane@corp.com"</div>
+    </div>
+    <div class="claim-card" style="--cc-color:var(--copper)">
+      <div class="claim-card-type">email scope</div>
+      <div class="claim-card-name">email_verified</div>
+      <div class="claim-card-desc">Boolean — whether the Auth Server has verified this email address. Do not trust unverified emails for critical operations.</div>
+      <div class="claim-example">true</div>
+    </div>
+    <div class="claim-card" style="--cc-color:var(--sage)">
+      <div class="claim-card-type">oidc-specific</div>
+      <div class="claim-card-name">nonce</div>
+      <div class="claim-card-desc">Random value sent in the auth request, echoed in the ID Token. Validates the token response corresponds to your specific request — prevents replay attacks.</div>
+      <div class="claim-example">"abc123xyz"</div>
+    </div>
+    <div class="claim-card" style="--cc-color:var(--sage)">
+      <div class="claim-card-type">oidc-specific</div>
+      <div class="claim-card-name">auth_time</div>
+      <div class="claim-card-desc">When the user last authenticated (Unix timestamp). Useful for step-up authentication — require fresh auth if auth_time is too old for sensitive operations.</div>
+      <div class="claim-example">1739996400</div>
+    </div>
+    <div class="claim-card" style="--cc-color:var(--sage)">
+      <div class="claim-card-type">oidc-specific</div>
+      <div class="claim-card-name">acr</div>
+      <div class="claim-card-desc">Authentication Context Class Reference — the assurance level of the authentication. E.g., "urn:mace:incommon:iap:bronze" for password, higher for MFA.</div>
+      <div class="claim-example">"urn:…:iap:silver"</div>
+    </div>
+    <div class="claim-card" style="--cc-color:var(--muted)">
+      <div class="claim-card-type">address scope</div>
+      <div class="claim-card-name">address</div>
+      <div class="claim-card-desc">Structured JSON object with formatted, street_address, locality, region, postal_code, country. Typically needed only for e-commerce or KYC flows.</div>
+      <div class="claim-example">{ "country": "US", … }</div>
+    </div>
+  </div>
+</section>
+
+<div class="hr-fancy" id="scopes"><div class="hr-diamond"></div></div>
+
+<!-- ── SCOPES ── -->
+<section>
+  <div class="reveal">
+    <span class="section-number">04</span>
+    <div class="section-label-text">Access Granularity</div>
+    <h2>OIDC <em>Scopes</em></h2>
+    <p class="section-intro">
+      Scopes determine which claims are available in the ID Token and from the UserInfo endpoint.
+      Request only what you need — principle of least privilege.
+    </p>
+  </div>
+
+  <div class="scopes-list reveal">
+    <div class="scope-item">
+      <div class="scope-name">openid</div>
+      <div class="scope-body">
+        <div class="scope-desc"><strong>Required.</strong> Signals this is an OIDC request (not plain OAuth2). Without this scope, no ID Token is issued and no <code>/userinfo</code> endpoint is available. Always include this.</div>
+        <div class="scope-claims">
+          <span class="scope-claim-tag">sub</span>
+          <span class="scope-claim-tag">iss</span>
+          <span class="scope-claim-tag">aud</span>
+          <span class="scope-claim-tag">exp</span>
+          <span class="scope-claim-tag">iat</span>
+        </div>
+      </div>
+    </div>
+    <div class="scope-item">
+      <div class="scope-name">profile</div>
+      <div class="scope-body">
+        <div class="scope-desc">Access to the user's basic profile information. Returns name components, picture URL, preferred username, website, gender, birthdate, timezone, locale, and last updated time.</div>
+        <div class="scope-claims">
+          <span class="scope-claim-tag">name</span>
+          <span class="scope-claim-tag">given_name</span>
+          <span class="scope-claim-tag">family_name</span>
+          <span class="scope-claim-tag">middle_name</span>
+          <span class="scope-claim-tag">nickname</span>
+          <span class="scope-claim-tag">picture</span>
+          <span class="scope-claim-tag">preferred_username</span>
+          <span class="scope-claim-tag">locale</span>
+          <span class="scope-claim-tag">zoneinfo</span>
+          <span class="scope-claim-tag">updated_at</span>
+        </div>
+      </div>
+    </div>
+    <div class="scope-item">
+      <div class="scope-name">email</div>
+      <div class="scope-body">
+        <div class="scope-desc">Access to the user's email address and its verification status. Always check <code>email_verified</code> — an unverified email could belong to anyone who claimed it during registration.</div>
+        <div class="scope-claims">
+          <span class="scope-claim-tag">email</span>
+          <span class="scope-claim-tag">email_verified</span>
+        </div>
+      </div>
+    </div>
+    <div class="scope-item">
+      <div class="scope-name">phone</div>
+      <div class="scope-body">
+        <div class="scope-desc">Access to the user's phone number and its verification status. Similarly, check <code>phone_number_verified</code> before using for authentication purposes.</div>
+        <div class="scope-claims">
+          <span class="scope-claim-tag">phone_number</span>
+          <span class="scope-claim-tag">phone_number_verified</span>
+        </div>
+      </div>
+    </div>
+    <div class="scope-item">
+      <div class="scope-name">address</div>
+      <div class="scope-body">
+        <div class="scope-desc">Access to the user's physical mailing address. Returns a JSON structure with sub-fields. Typically needed only for e-commerce, delivery, or compliance flows.</div>
+        <div class="scope-claims">
+          <span class="scope-claim-tag">address.formatted</span>
+          <span class="scope-claim-tag">address.street_address</span>
+          <span class="scope-claim-tag">address.locality</span>
+          <span class="scope-claim-tag">address.region</span>
+          <span class="scope-claim-tag">address.postal_code</span>
+          <span class="scope-claim-tag">address.country</span>
+        </div>
+      </div>
+    </div>
+    <div class="scope-item">
+      <div class="scope-name">offline_access</div>
+      <div class="scope-body">
+        <div class="scope-desc">Requests a <strong>refresh token</strong> to enable long-lived sessions without re-prompting the user. Auth Servers may require explicit user consent for this scope. Required for background/daemon processes acting on behalf of a user.</div>
+        <div class="scope-claims">
+          <span class="scope-claim-tag">refresh_token issued</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="hr-fancy"><div class="hr-diamond"></div></div>
+
+<!-- ── DISCOVERY DOCUMENT ── -->
+<section>
+  <div class="reveal">
+    <span class="section-number">05</span>
+    <div class="section-label-text">Self-Describing Servers</div>
+    <h2>Discovery<br><em>Document</em></h2>
+    <p class="section-intro">
+      Every OIDC provider publishes a JSON metadata document at a well-known URL.
+      This single document tells clients everything they need — endpoints, supported algorithms, JWKS location.
+      Spring Security fetches this automatically at startup.
+    </p>
+  </div>
+
+  <div class="discovery-grid reveal">
+    <div class="discovery-card">
+      <div class="discovery-card-header">
+        <span class="icon">🔍</span>
+        <span class="title">Well-Known Endpoint</span>
+      </div>
+      <div class="discovery-card-body">
+        <div style="font-family:'DM Mono',monospace;font-size:0.72rem;color:var(--copper);background:rgba(181,101,29,0.05);padding:12px 14px;border-radius:6px;margin-bottom:16px;word-break:break-all;line-height:1.6;">
+          {issuer-uri}/.well-known/<strong>openid-configuration</strong>
+        </div>
+        <div style="font-size:0.75rem;color:var(--muted);line-height:1.7;font-weight:300;">
+          Fetch this URL to bootstrap your OIDC client. Spring Security uses the
+          <code>issuer-uri</code> property to auto-discover everything else.
+        </div>
+        <div style="margin-top:16px;">
+          <div style="font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;">Popular providers</div>
+          <div style="display:flex;flex-direction:column;gap:4px;">
+            <div style="font-family:'DM Mono',monospace;font-size:0.62rem;color:var(--navy-light)">Keycloak: /realms/{realm}/.well-known/openid-configuration</div>
+            <div style="font-family:'DM Mono',monospace;font-size:0.62rem;color:var(--navy-light)">Google: accounts.google.com/.well-known/openid-configuration</div>
+            <div style="font-family:'DM Mono',monospace;font-size:0.62rem;color:var(--navy-light)">Auth0: {domain}/.well-known/openid-configuration</div>
+            <div style="font-family:'DM Mono',monospace;font-size:0.62rem;color:var(--navy-light)">Okta: {domain}/oauth2/default/.well-known/openid-configuration</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="discovery-card">
+      <div class="discovery-card-header">
+        <span class="icon">📋</span>
+        <span class="title">Key Endpoints in the Document</span>
+      </div>
+      <div class="discovery-card-body">
+        <div class="endpoint-row">
+          <div class="endpoint-path">authorization_endpoint</div>
+          <div class="endpoint-desc">Where to redirect users to authenticate</div>
+        </div>
+        <div class="endpoint-row">
+          <div class="endpoint-path">token_endpoint</div>
+          <div class="endpoint-desc">Where to exchange codes for tokens</div>
+        </div>
+        <div class="endpoint-row">
+          <div class="endpoint-path">userinfo_endpoint</div>
+          <div class="endpoint-desc">Where to fetch additional user claims</div>
+        </div>
+        <div class="endpoint-row">
+          <div class="endpoint-path">jwks_uri</div>
+          <div class="endpoint-desc">Public keys for ID Token signature verification</div>
+        </div>
+        <div class="endpoint-row">
+          <div class="endpoint-path">end_session_endpoint</div>
+          <div class="endpoint-desc">For OIDC logout (RP-initiated logout)</div>
+        </div>
+        <div class="endpoint-row" style="border-bottom:none">
+          <div class="endpoint-path">id_token_signing_alg_values_supported</div>
+          <div class="endpoint-desc">List of supported signing algorithms</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="hr-fancy" id="spring"><div class="hr-diamond"></div></div>
+
+<!-- ── SPRING BOOT ── -->
+<section>
+  <div class="reveal">
+    <span class="section-number">06</span>
+    <div class="section-label-text">Spring Boot 3.x Integration</div>
+    <h2>Production<br><em>Code</em></h2>
+    <p class="section-intro">
+      Spring Security abstracts the entire OIDC flow. You configure an issuer URI,
+      and it handles discovery, JWKS fetching, token validation, and user session management automatically.
+    </p>
+  </div>
+
+  <div class="code-book reveal">
+    <div class="code-book-spine">
+      <div class="spine-dots">
+        <div class="spine-dot" style="background:#f47067"></div>
+        <div class="spine-dot" style="background:#f4c053"></div>
+        <div class="spine-dot" style="background:#4caf50"></div>
+      </div>
+      <div class="spine-title">Spring Boot 3.x · OIDC Integration</div>
+      <button class="copy-btn" onclick="copyActiveCode()">copy</button>
+    </div>
+    <div class="code-book-tabs">
+      <div class="cb-tab active" onclick="showCbTab('yaml', event)">application.yml</div>
+      <div class="cb-tab" onclick="showCbTab('security', event)">SecurityConfig.java</div>
+      <div class="cb-tab" onclick="showCbTab('controller', event)">UserController.java</div>
+      <div class="cb-tab" onclick="showCbTab('logout', event)">OidcLogout.java</div>
+      <div class="cb-tab" onclick="showCbTab('userservice', event)">UserService.java</div>
+    </div>
+
+    <!-- YAML -->
+    <div class="cb-panel active" id="cb-yaml">
+      <pre><span class="cm"># application.yml — OIDC Client Configuration</span>
+<span class="kw">spring:</span>
+  <span class="kw">security:</span>
+    <span class="kw">oauth2:</span>
+      <span class="kw">client:</span>
+        <span class="kw">registration:</span>
+
+          <span class="cm"># --- Keycloak (Self-hosted) ---</span>
+          <span class="kw">keycloak:</span>
+            <span class="kw">client-id:</span> <span class="st">my-spring-app</span>
+            <span class="kw">client-secret:</span> <span class="st">${KEYCLOAK_CLIENT_SECRET}</span>
+            <span class="kw">scope:</span> <span class="st">openid, profile, email, roles, offline_access</span>
+            <span class="kw">authorization-grant-type:</span> <span class="st">authorization_code</span>
+            <span class="kw">redirect-uri:</span> <span class="st">"{baseUrl}/login/oauth2/code/keycloak"</span>
+
+          <span class="cm"># --- Google ---</span>
+          <span class="kw">google:</span>
+            <span class="kw">client-id:</span> <span class="st">${GOOGLE_CLIENT_ID}</span>
+            <span class="kw">client-secret:</span> <span class="st">${GOOGLE_CLIENT_SECRET}</span>
+            <span class="kw">scope:</span> <span class="st">openid, profile, email</span>
+
+          <span class="cm"># --- Auth0 ---</span>
+          <span class="kw">auth0:</span>
+            <span class="kw">client-id:</span> <span class="st">${AUTH0_CLIENT_ID}</span>
+            <span class="kw">client-secret:</span> <span class="st">${AUTH0_CLIENT_SECRET}</span>
+            <span class="kw">scope:</span> <span class="st">openid, profile, email</span>
+            <span class="kw">authorization-grant-type:</span> <span class="st">authorization_code</span>
+
+        <span class="kw">provider:</span>
+          <span class="kw">keycloak:</span>
+            <span class="cm"># Spring fetches /.well-known/openid-configuration automatically!</span>
+            <span class="kw">issuer-uri:</span> <span class="st">https://keycloak.corp.com/realms/production</span>
+          <span class="kw">auth0:</span>
+            <span class="kw">issuer-uri:</span> <span class="st">https://your-tenant.auth0.com/</span>
+
+<span class="cm"># Session config (for SSO logout)</span>
+<span class="kw">server:</span>
+  <span class="kw">servlet:</span>
+    <span class="kw">session:</span>
+      <span class="kw">timeout:</span> <span class="st">30m</span>
+      <span class="kw">cookie:</span>
+        <span class="kw">http-only:</span> <span class="bo">true</span>
+        <span class="kw">secure:</span> <span class="bo">true</span>
+        <span class="kw">same-site:</span> <span class="st">Lax</span></pre>
+    </div>
+
+    <!-- SecurityConfig -->
+    <div class="cb-panel" id="cb-security">
+      <pre><span class="an">@Configuration</span>
+<span class="an">@EnableWebSecurity</span>
+<span class="an">@EnableMethodSecurity</span>
+<span class="kw">public class</span> <span class="tp">SecurityConfig</span> {
+
+    <span class="an">@Bean</span>
+    <span class="kw">public</span> <span class="tp">SecurityFilterChain</span> <span class="me">filterChain</span>(<span class="tp">HttpSecurity</span> http) <span class="kw">throws</span> <span class="tp">Exception</span> {
+        http
+            .<span class="me">authorizeHttpRequests</span>(auth -> auth
+                .<span class="me">requestMatchers</span>(<span class="st">"/public/**"</span>, <span class="st">"/error"</span>).<span class="me">permitAll</span>()
+                .<span class="me">requestMatchers</span>(<span class="st">"/admin/**"</span>).<span class="me">hasRole</span>(<span class="st">"ADMIN"</span>)
+                .<span class="me">anyRequest</span>().<span class="me">authenticated</span>()  <span class="cm">// All others require login</span>
+            )
+
+            <span class="cm">// OIDC login — Spring handles the entire flow</span>
+            .<span class="me">oauth2Login</span>(oidc -> oidc
+                .<span class="me">loginPage</span>(<span class="st">"/login"</span>)              <span class="cm">// Custom login page URL</span>
+                .<span class="me">defaultSuccessUrl</span>(<span class="st">"/dashboard"</span>, <span class="bo">true</span>)
+                .<span class="me">userInfoEndpoint</span>(userInfo -> userInfo
+                    .<span class="me">oidcUserService</span>(<span class="me">oidcUserService</span>())  <span class="cm">// Custom user loading</span>
+                )
+            )
+
+            <span class="cm">// OIDC logout — invalidates session + tells IdP</span>
+            .<span class="me">logout</span>(logout -> logout
+                .<span class="me">logoutSuccessHandler</span>(<span class="kw">new</span> <span class="tp">OidcClientInitiatedLogoutSuccessHandler</span>(
+                    clientRegistrationRepository))
+                .<span class="me">invalidateHttpSession</span>(<span class="bo">true</span>)
+                .<span class="me">clearAuthentication</span>(<span class="bo">true</span>)
+                .<span class="me">deleteCookies</span>(<span class="st">"JSESSIONID"</span>)
+            );
+
+        <span class="kw">return</span> http.<span class="me">build</span>();
+    }
+
+    <span class="an">@Bean</span>
+    <span class="kw">public</span> <span class="tp">OidcUserService</span> <span class="me">oidcUserService</span>() {
+        <span class="tp">OidcUserService</span> delegate = <span class="kw">new</span> <span class="tp">OidcUserService</span>();
+
+        <span class="kw">return</span> oidcUserRequest -> {
+            <span class="cm">// Let the default service load the user from /userinfo</span>
+            <span class="tp">OidcUser</span> oidcUser = delegate.<span class="me">loadUser</span>(oidcUserRequest);
+
+            <span class="cm">// Extract roles from ID Token custom claim</span>
+            <span class="tp">List</span>&lt;<span class="tp">String</span>&gt; roles = oidcUser.<span class="me">getIdToken</span>()
+                .<span class="me">getClaimAsStringList</span>(<span class="st">"roles"</span>);
+
+            <span class="kw">var</span> authorities = roles.<span class="me">stream</span>()
+                .<span class="me">map</span>(r -> <span class="kw">new</span> <span class="tp">SimpleGrantedAuthority</span>(<span class="st">"ROLE_"</span> + r))
+                .<span class="me">collect</span>(<span class="tp">Collectors</span>.<span class="me">toSet</span>());
+
+            <span class="cm">// Merge default authorities + custom roles</span>
+            authorities.<span class="me">addAll</span>(oidcUser.<span class="me">getAuthorities</span>());
+
+            <span class="kw">return new</span> <span class="tp">DefaultOidcUser</span>(authorities,
+                oidcUser.<span class="me">getIdToken</span>(), oidcUser.<span class="me">getUserInfo</span>());
+        };
+    }
+}</pre>
+    </div>
+
+    <!-- Controller -->
+    <div class="cb-panel" id="cb-controller">
+      <pre><span class="an">@RestController</span>
+<span class="kw">public class</span> <span class="tp">UserController</span> {
+
+    <span class="cm">/**
+     * Get the currently authenticated user's identity from the OIDC session.
+     * @AuthenticationPrincipal injects the OidcUser loaded after login.
+     */</span>
+    <span class="an">@GetMapping</span>(<span class="st">"/me"</span>)
+    <span class="kw">public</span> <span class="tp">UserProfileResponse</span> <span class="me">getMe</span>(
+            <span class="an">@AuthenticationPrincipal</span> <span class="tp">OidcUser</span> oidcUser) {
+
+        <span class="cm">// Access ID Token claims directly</span>
+        <span class="tp">String</span> sub    = oidcUser.<span class="me">getSubject</span>();        <span class="cm">// Stable user ID</span>
+        <span class="tp">String</span> email  = oidcUser.<span class="me">getEmail</span>();          <span class="cm">// From email scope</span>
+        <span class="tp">String</span> name   = oidcUser.<span class="me">getFullName</span>();       <span class="cm">// From profile scope</span>
+        <span class="tp">String</span> pic    = oidcUser.<span class="me">getPicture</span>();        <span class="cm">// Profile picture URL</span>
+        <span class="tp">Boolean</span> ver   = oidcUser.<span class="me">getEmailVerified</span>(); <span class="cm">// Always check this!</span>
+        <span class="tp">Instant</span> auth  = oidcUser.<span class="me">getAuthenticatedAt</span>(); <span class="cm">// auth_time claim</span>
+
+        <span class="cm">// Access raw claims for custom fields (e.g., from Keycloak)</span>
+        <span class="tp">List</span>&lt;<span class="tp">String</span>&gt; roles = oidcUser.<span class="me">getIdToken</span>()
+                .<span class="me">getClaimAsStringList</span>(<span class="st">"roles"</span>);
+
+        <span class="cm">// Access UserInfo attributes (fetched from /userinfo endpoint)</span>
+        <span class="tp">String</span> locale = oidcUser.<span class="me">getUserInfo</span>()
+                .<span class="me">getClaimAsString</span>(<span class="st">"locale"</span>);
+
+        <span class="kw">return new</span> <span class="tp">UserProfileResponse</span>(sub, email, name, roles);
+    }
+
+    <span class="cm">// Step-up authentication: require fresh authentication for sensitive ops</span>
+    <span class="an">@PostMapping</span>(<span class="st">"/account/delete"</span>)
+    <span class="an">@PreAuthorize</span>(<span class="st">"hasRole('USER')"</span>)
+    <span class="kw">public</span> <span class="tp">ResponseEntity</span>&lt;?&gt; <span class="me">deleteAccount</span>(
+            <span class="an">@AuthenticationPrincipal</span> <span class="tp">OidcUser</span> oidcUser) {
+
+        <span class="tp">Instant</span> authTime = oidcUser.<span class="me">getAuthenticatedAt</span>();
+        <span class="kw">boolean</span> recentAuth = authTime.<span class="me">isAfter</span>(<span class="tp">Instant</span>.<span class="me">now</span>().<span class="me">minusSeconds</span>(<span class="nu">300</span>));
+
+        <span class="kw">if</span> (!recentAuth) {
+            <span class="cm">// Force re-authentication for sensitive operation</span>
+            <span class="kw">return</span> <span class="tp">ResponseEntity</span>.<span class="me">status</span>(<span class="nu">401</span>)
+                .<span class="me">header</span>(<span class="st">"WWW-Authenticate"</span>, <span class="st">"Bearer realm=\"step-up\""</span>)
+                .<span class="me">build</span>();
+        }
+
+        userService.<span class="me">deleteUser</span>(oidcUser.<span class="me">getSubject</span>());
+        <span class="kw">return</span> <span class="tp">ResponseEntity</span>.<span class="me">noContent</span>().<span class="me">build</span>();
+    }
+}</pre>
+    </div>
+
+    <!-- Logout -->
+    <div class="cb-panel" id="cb-logout">
+      <pre><span class="cm">/**
+ * OIDC supports two logout flows:
+ *
+ * 1. RP-Initiated Logout: Your app redirects user to the IdP logout endpoint.
+ *    IdP clears its session and redirects back to your post_logout_redirect_uri.
+ *
+ * 2. Back-Channel Logout: IdP proactively notifies your app when a session
+ *    ends elsewhere (e.g., user logs out from another app in the same SSO session).
+ */</span>
+<span class="an">@Configuration</span>
+<span class="kw">public class</span> <span class="tp">OidcLogoutConfig</span> {
+
+    <span class="an">@Bean</span>
+    <span class="kw">public</span> <span class="tp">SecurityFilterChain</span> <span class="me">logoutChain</span>(<span class="tp">HttpSecurity</span> http,
+            <span class="tp">ClientRegistrationRepository</span> repo) <span class="kw">throws</span> <span class="tp">Exception</span> {
+
+        <span class="cm">// RP-Initiated Logout (standard)</span>
+        <span class="tp">OidcClientInitiatedLogoutSuccessHandler</span> logoutHandler =
+            <span class="kw">new</span> <span class="tp">OidcClientInitiatedLogoutSuccessHandler</span>(repo);
+
+        <span class="cm">// Where to land after IdP logout completes</span>
+        logoutHandler.<span class="me">setPostLogoutRedirectUri</span>(<span class="st">"https://app.corp.com/logged-out"</span>);
+
+        http.<span class="me">logout</span>(logout -> logout
+            .<span class="me">logoutUrl</span>(<span class="st">"/logout"</span>)
+            .<span class="me">logoutSuccessHandler</span>(logoutHandler)
+            .<span class="me">invalidateHttpSession</span>(<span class="bo">true</span>)
+            .<span class="me">clearAuthentication</span>(<span class="bo">true</span>)
+            .<span class="me">deleteCookies</span>(<span class="st">"JSESSIONID"</span>, <span class="st">"remember-me"</span>)
+        );
+
+        <span class="kw">return</span> http.<span class="me">build</span>();
+    }
+}
+
+<span class="cm">// Back-Channel Logout (Spring Security 6.2+)</span>
+<span class="cm">// application.yml:</span>
+<span class="cm">// spring.security.oauth2.client.provider.keycloak.back-channel-logout-uri:</span>
+<span class="cm">//   {baseUrl}/logout/connect/back-channel/{registrationId}</span>
+<span class="an">@Component</span>
+<span class="kw">public class</span> <span class="tp">BackChannelLogoutHandler</span> {
+
+    <span class="cm">// Spring Security 6.2+ handles this automatically when configured.</span>
+    <span class="cm">// IdP POSTs a logout_token (JWT) to your back-channel URI.</span>
+    <span class="cm">// Spring validates it and invalidates the corresponding session.</span>
+
+    <span class="cm">// For older setups, you can implement SessionRegistry to track sessions by sub:</span>
+    <span class="an">@Autowired</span>
+    <span class="kw">private</span> <span class="tp">SessionRegistry</span> sessionRegistry;
+
+    <span class="kw">public void</span> <span class="me">handleLogout</span>(<span class="tp">String</span> sub) {
+        sessionRegistry.<span class="me">getAllPrincipals</span>().<span class="me">stream</span>()
+            .<span class="me">filter</span>(p -> ((<span class="tp">OidcUser</span>) p).<span class="me">getSubject</span>().<span class="me">equals</span>(sub))
+            .<span class="me">flatMap</span>(p -> sessionRegistry.<span class="me">getAllSessions</span>(p, <span class="bo">false</span>).<span class="me">stream</span>())
+            .<span class="me">forEach</span>(<span class="tp">SessionInformation</span>::<span class="me">expireNow</span>);
+    }
+}</pre>
+    </div>
+
+    <!-- UserService -->
+    <div class="cb-panel" id="cb-userservice">
+      <pre><span class="cm">/**
+ * Best practice: auto-provision users in your DB on first OIDC login.
+ * Use 'sub' as the stable external ID, never email.
+ */</span>
+<span class="an">@Service</span>
+<span class="an">@Transactional</span>
+<span class="kw">public class</span> <span class="tp">UserProvisioningService</span> {
+
+    <span class="an">@Autowired</span> <span class="kw">private</span> <span class="tp">UserRepository</span> userRepo;
+    <span class="an">@Autowired</span> <span class="kw">private</span> <span class="tp">AuditLogService</span> auditLog;
+
+    <span class="cm">/**
+     * Called after successful OIDC login.
+     * Upserts the user based on their 'sub' claim.
+     */</span>
+    <span class="kw">public</span> <span class="tp">AppUser</span> <span class="me">provisionFromOidc</span>(<span class="tp">OidcUser</span> oidcUser) {
+        <span class="tp">String</span> sub   = oidcUser.<span class="me">getSubject</span>();  <span class="cm">// Stable ID — use as FK</span>
+        <span class="tp">String</span> email = oidcUser.<span class="me">getEmail</span>();
+
+        <span class="cm">// ⚠️  email_verified check before using email</span>
+        <span class="kw">if</span> (!<span class="tp">Boolean</span>.<span class="me">TRUE</span>.<span class="me">equals</span>(oidcUser.<span class="me">getEmailVerified</span>())) {
+            <span class="kw">throw new</span> <span class="tp">UnverifiedEmailException</span>(<span class="st">"Email not verified for sub: "</span> + sub);
+        }
+
+        <span class="kw">return</span> userRepo.<span class="me">findByOidcSub</span>(sub)
+            .<span class="me">map</span>(existing -> {
+                <span class="cm">// Update profile if changed at IdP</span>
+                existing.<span class="me">setEmail</span>(email);
+                existing.<span class="me">setDisplayName</span>(oidcUser.<span class="me">getFullName</span>());
+                existing.<span class="me">setLastLoginAt</span>(<span class="tp">Instant</span>.<span class="me">now</span>());
+                <span class="kw">return</span> userRepo.<span class="me">save</span>(existing);
+            })
+            .<span class="me">orElseGet</span>(() -> {
+                <span class="cm">// First-time login — provision new user</span>
+                <span class="tp">AppUser</span> newUser = <span class="tp">AppUser</span>.<span class="me">builder</span>()
+                    .<span class="me">oidcSub</span>(sub)                      <span class="cm">// external ID from IdP</span>
+                    .<span class="me">email</span>(email)
+                    .<span class="me">displayName</span>(oidcUser.<span class="me">getFullName</span>())
+                    .<span class="me">picture</span>(oidcUser.<span class="me">getPicture</span>())
+                    .<span class="me">roles</span>(<span class="tp">Set</span>.<span class="me">of</span>(<span class="st">"USER"</span>))
+                    .<span class="me">createdAt</span>(<span class="tp">Instant</span>.<span class="me">now</span>())
+                    .<span class="me">build</span>();
+
+                auditLog.<span class="me">log</span>(<span class="st">"USER_PROVISIONED"</span>, sub, <span class="st">"First OIDC login"</span>);
+                <span class="kw">return</span> userRepo.<span class="me">save</span>(newUser);
+            });
+    }
+}</pre>
+    </div>
+  </div>
+</section>
+
+<div class="hr-fancy" id="security"><div class="hr-diamond"></div></div>
+
+<!-- ── SECURITY ── -->
+<section>
+  <div class="reveal">
+    <span class="section-number">07</span>
+    <div class="section-label-text">Hardening & Best Practices</div>
+    <h2>Security<br><em>Imperatives</em></h2>
+    <p class="section-intro">
+      OIDC is only as secure as its implementation. These are the non-negotiables
+      for a production-grade system.
+    </p>
+  </div>
+
+  <div class="security-items reveal">
+    <div class="sec-item" style="--si-color:var(--sage)">
+      <div class="sec-item-head">
+        <span class="sec-icon">✅</span>
+        <span class="sec-title">Always validate the ID Token</span>
+      </div>
+      <div class="sec-desc">Never skip signature, iss, aud, exp, or nonce validation. Spring Security does this automatically — never bypass it with custom logic. An unvalidated ID Token is worthless as proof of identity.</div>
+    </div>
+
+    <div class="sec-item" style="--si-color:var(--rust)">
+      <div class="sec-item-head">
+        <span class="sec-icon">❌</span>
+        <span class="sec-title">Never use email as a primary key</span>
+      </div>
+      <div class="sec-desc">Emails change and can be re-assigned. Use the <code>sub</code> claim — it's the stable, unique identifier for a user within an issuer. Store sub as your external identity FK.</div>
+    </div>
+
+    <div class="sec-item" style="--si-color:var(--sage)">
+      <div class="sec-item-head">
+        <span class="sec-icon">✅</span>
+        <span class="sec-title">Check email_verified before trusting email</span>
+      </div>
+      <div class="sec-desc">An unverified email could be anyone who typed it in. Always check <code>email_verified: true</code> before using email for password resets, notifications, or identity matching.</div>
+    </div>
+
+    <div class="sec-item" style="--si-color:var(--rust)">
+      <div class="sec-item-head">
+        <span class="sec-icon">❌</span>
+        <span class="sec-title">Never put secrets in ID Token claims</span>
+      </div>
+      <div class="sec-desc">The ID Token payload is base64url encoded, NOT encrypted. Anyone who intercepts it can decode the claims. Use JWE (JSON Web Encryption) if you need encrypted payloads.</div>
+    </div>
+
+    <div class="sec-item" style="--si-color:var(--sage)">
+      <div class="sec-item-head">
+        <span class="sec-icon">✅</span>
+        <span class="sec-title">Use nonce for replay prevention</span>
+      </div>
+      <div class="sec-desc">Always generate and send a cryptographically random <code>nonce</code> in your auth request. Validate it in the returned ID Token. Prevents token replay across different authorization requests.</div>
+    </div>
+
+    <div class="sec-item" style="--si-color:var(--sage)">
+      <div class="sec-item-head">
+        <span class="sec-icon">✅</span>
+        <span class="sec-title">Implement step-up authentication</span>
+      </div>
+      <div class="sec-desc">Check the <code>auth_time</code> claim before sensitive operations (deleting account, changing payment). If the user authenticated too long ago, redirect them to re-authenticate at the IdP.</div>
+    </div>
+
+    <div class="sec-item" style="--si-color:var(--navy)">
+      <div class="sec-item-head">
+        <span class="sec-icon">🔐</span>
+        <span class="sec-title">Use RS256, not HS256 in production</span>
+      </div>
+      <div class="sec-desc">RS256 uses asymmetric keys — the IdP signs with a private key, you verify with its public key (JWKS). HS256 uses a shared secret, meaning your app could forge tokens. Always prefer RS256/ES256.</div>
+    </div>
+
+    <div class="sec-item" style="--si-color:var(--navy)">
+      <div class="sec-item-head">
+        <span class="sec-icon">🔑</span>
+        <span class="sec-title">Implement OIDC logout properly</span>
+      </div>
+      <div class="sec-desc">Just clearing local session is not enough in SSO environments. Use RP-Initiated Logout to tell the IdP the user logged out, and implement Back-Channel Logout to handle IdP-initiated logout events.</div>
+    </div>
+
+    <div class="sec-item" style="--si-color:var(--rust)">
+      <div class="sec-item-head">
+        <span class="sec-icon">❌</span>
+        <span class="sec-title">Don't trust claims from Access Tokens for identity</span>
+      </div>
+      <div class="sec-desc">The Access Token is meant for API authorization, not identity. Its format and claims aren't standardized across providers. Always use the ID Token or <code>/userinfo</code> endpoint for user identity.</div>
+    </div>
+
+    <div class="sec-item" style="--si-color:var(--copper)">
+      <div class="sec-item-head">
+        <span class="sec-icon">⚙️</span>
+        <span class="sec-title">Register exact redirect URIs</span>
+      </div>
+      <div class="sec-desc">Configure precise redirect URIs at the IdP — no wildcards. Open redirect vulnerabilities allow attackers to steal authorization codes by registering a similar-looking URI. Be exact.</div>
+    </div>
+  </div>
+
+  <!-- OIDC vs OAuth2 final comparison -->
+  <div style="margin-top:56px" class="reveal">
+    <h3 style="font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:700;color:var(--navy);margin-bottom:24px;">OIDC vs OAuth2 — <em style="color:var(--copper)">Full Comparison</em></h3>
+    <div class="comparison-wrapper">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th>Aspect</th>
+            <th>OAuth 2.0</th>
+            <th>OpenID Connect</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>purpose</td>
+            <td>Delegates access (authorization)</td>
+            <td>Verifies identity (authentication) + authorization</td>
+          </tr>
+          <tr>
+            <td>answers</td>
+            <td>"Can this app access my data?"</td>
+            <td>"Who is this user?" + "Can they access?"</td>
+          </tr>
+          <tr>
+            <td>tokens issued</td>
+            <td>Access Token, Refresh Token</td>
+            <td>Access Token, Refresh Token, <strong>ID Token</strong></td>
+          </tr>
+          <tr>
+            <td>user identity</td>
+            <td class="cross-ico">✗ No standard way</td>
+            <td class="check-ico">✓ ID Token + /userinfo endpoint</td>
+          </tr>
+          <tr>
+            <td>required scope</td>
+            <td>Custom (e.g., read, write)</td>
+            <td>Must include <code>openid</code></td>
+          </tr>
+          <tr>
+            <td>nonce param</td>
+            <td class="cross-ico">✗ Not defined</td>
+            <td class="check-ico">✓ For replay prevention</td>
+          </tr>
+          <tr>
+            <td>discovery doc</td>
+            <td class="cross-ico">✗ Not standardized</td>
+            <td class="check-ico">✓ /.well-known/openid-configuration</td>
+          </tr>
+          <tr>
+            <td>session management</td>
+            <td class="cross-ico">✗ No standard</td>
+            <td class="check-ico">✓ Check Session, RP-Initiated Logout, Back-Channel Logout</td>
+          </tr>
+          <tr>
+            <td>spring config</td>
+            <td><code>oauth2ResourceServer()</code></td>
+            <td><code>oauth2Login()</code> + <code>OidcUser</code></td>
+          </tr>
+          <tr>
+            <td>use when</td>
+            <td>API access delegation, M2M, CLI tools</td>
+            <td>User login, SSO, social login, enterprise IdP</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">Open<em>ID</em> Connect</div>
+  <div class="footer-text">
+    OpenID Connect 1.0 · Built on OAuth 2.0 (RFC 6749)<br>
+    Spring Boot 3.x · Keycloak · Auth0 · Okta · Google
+  </div>
+  <div class="footer-links">
+    <span onclick="document.querySelector('#how-it-works').scrollIntoView({behavior:'smooth'})">Flow</span>
+    <span onclick="document.querySelector('#id-token').scrollIntoView({behavior:'smooth'})">ID Token</span>
+    <span onclick="document.querySelector('#spring').scrollIntoView({behavior:'smooth'})">Spring</span>
+    <span onclick="document.querySelector('#security').scrollIntoView({behavior:'smooth'})">Security</span>
+  </div>
+</footer>
+
+<script>
+// ── Token tabs in sidebar
+function showTokenTab(name, e) {
+  document.querySelectorAll('.token-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.token-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  e.target.classList.add('active');
+}
+
+// ── ID Token anatomy decode
+function showTaDecode(part) {
+  document.querySelectorAll('.ta-decoded').forEach(d => d.classList.remove('visible'));
+  const el = document.getElementById('ta-' + part);
+  if (el) el.classList.add('visible');
+}
+
+// ── Code book tabs
+function showCbTab(name, e) {
+  document.querySelectorAll('.cb-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.cb-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('cb-' + name).classList.add('active');
+  e.target.classList.add('active');
+}
+
+// ── Copy active code
+function copyActiveCode() {
+  const panel = document.querySelector('.cb-panel.active pre');
+  if (!panel) return;
+  navigator.clipboard.writeText(panel.innerText).then(() => {
+    const btn = document.querySelector('.copy-btn');
+    btn.textContent = 'copied!';
+    setTimeout(() => btn.textContent = 'copy', 2000);
+  });
+}
+
+// ── Scroll reveal
+const revealObs = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) e.target.classList.add('visible');
+  });
+}, { threshold: 0.1 });
+
+document.querySelectorAll('.reveal').forEach(el => revealObs.observe(el));
+
+// ── Flow steps stagger
+const flowObs = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      const steps = e.target.querySelectorAll('.flow-step-item');
+      steps.forEach((s, i) => {
+        setTimeout(() => s.classList.add('visible'), i * 140);
+      });
+      flowObs.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.1 });
+
+const flowList = document.getElementById('flowSteps');
+if (flowList) flowObs.observe(flowList);
+
+// ── Section nav dots
+const sections = ['hero', 'how-it-works', 'id-token', 'claims', 'scopes', 'spring', 'security'];
+const dots = document.querySelectorAll('.sn-dot');
+const navLinks = document.querySelectorAll('.nav-links a');
+
+const secObs = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      const idx = sections.indexOf(e.target.id);
+      if (idx !== -1) {
+        dots.forEach((d, i) => d.classList.toggle('active', i === idx));
+      }
+    }
+  });
+}, { threshold: 0.5 });
+
+sections.forEach(id => {
+  const el = document.getElementById(id);
+  if (el) secObs.observe(el);
+});
+
+// Active nav links
+window.addEventListener('scroll', () => {
+  const scrollY = window.scrollY;
+  navLinks.forEach(link => {
+    const href = link.getAttribute('href').slice(1);
+    const section = document.getElementById(href);
+    if (section) {
+      const top = section.offsetTop - 100;
+      const bot = top + section.offsetHeight;
+      link.classList.toggle('active', scrollY >= top && scrollY < bot);
+    }
+  });
+});
+</script>
+</body>
+</html>
