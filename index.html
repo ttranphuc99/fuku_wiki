@@ -6,9 +6,216 @@
     <title>Fuku's Knowledge Base</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Spectral:wght@500;600;700&family=Inter:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        html { scroll-behavior: smooth; }
+        @media (prefers-reduced-motion: reduce){ html{ scroll-behavior:auto; } }
+
+        /* ---------- Readiness Statement (scoped under .rs-root) ---------- */
+        .rs-root{
+          --bg:#0F1B2D;
+          --panel:#16243A;
+          --panel-2:#1C2C46;
+          --paper:#EDE6D6;
+          --gold:#C9A227;
+          --gold-dim:#8f7420;
+          --teal:#4C9A8B;
+          --text:#E8E4DA;
+          --text-muted:#8A93A6;
+          --border:rgba(201,162,39,0.22);
+          --hair:rgba(232,228,218,0.10);
+          --radius:2px;
+
+          /* full-bleed break-out of the padded wiki body */
+          width:100vw;
+          margin-left:calc(50% - 50vw);
+          margin-top:64px;
+          background:var(--bg);
+          color:var(--text);
+          font-family:'Inter',sans-serif;
+          font-size:15px;
+          line-height:1.6;
+        }
+        .rs-root *{ box-sizing:border-box; }
+        @media (prefers-reduced-motion: reduce){ .rs-root *{ animation:none !important; transition:none !important; } }
+
+        .rs-root h1,.rs-root h2,.rs-root h3{ font-family:'Spectral',serif; font-weight:600; margin:0; }
+        .rs-root .mono{ font-family:'IBM Plex Mono',monospace; }
+        .rs-root a{ color:var(--teal); }
+        .rs-root a:hover{ color:var(--gold); }
+        .rs-root :focus-visible{ outline:2px solid var(--gold); outline-offset:2px; }
+
+        /* ---------- Header / statement head ---------- */
+        .rs-root .statement-header{
+          max-width:1180px;
+          margin:0 auto;
+          padding:48px 32px 28px;
+          border-bottom:1px solid var(--border);
+        }
+        .rs-root .eyebrow{
+          font-family:'IBM Plex Mono',monospace;
+          font-size:11px;
+          letter-spacing:0.18em;
+          text-transform:uppercase;
+          color:var(--gold);
+          margin-bottom:10px;
+        }
+        .rs-root .statement-header h1{
+          font-size:clamp(28px,4vw,42px);
+          color:var(--text);
+          max-width:720px;
+        }
+        .rs-root .statement-meta{
+          display:flex;
+          flex-wrap:wrap;
+          gap:28px;
+          margin-top:22px;
+          font-family:'IBM Plex Mono',monospace;
+          font-size:12.5px;
+          color:var(--text-muted);
+        }
+        .rs-root .statement-meta div span{ display:block; color:var(--text); font-size:14px; margin-top:2px; }
+        .rs-root .statement-meta input{
+          background:transparent;
+          border:none;
+          border-bottom:1px solid var(--border);
+          color:var(--text);
+          font-family:'IBM Plex Mono',monospace;
+          font-size:14px;
+          padding:2px 0;
+          width:150px;
+        }
+        .rs-root .statement-meta input:focus{ border-bottom-color:var(--gold); }
+
+        /* ---------- Balance bar (signature element) ---------- */
+        .rs-root .balance-bar{
+          position:sticky; top:0; z-index:20;
+          background:rgba(15,27,45,0.94);
+          backdrop-filter:blur(6px);
+          border-bottom:1px solid var(--border);
+        }
+        .rs-root .balance-inner{
+          max-width:1180px; margin:0 auto;
+          padding:12px 32px;
+          display:flex; align-items:center; justify-content:space-between;
+          gap:16px; flex-wrap:wrap;
+        }
+        .rs-root .balance-label{ font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:var(--text-muted); }
+        .rs-root .balance-track{
+          flex:1; min-width:160px; max-width:340px;
+          height:4px; background:var(--panel-2); position:relative; overflow:hidden;
+        }
+        .rs-root .balance-fill{ position:absolute; inset:0; width:0%; background:var(--gold); transition:width .4s ease; }
+        .rs-root .balance-value{ font-family:'IBM Plex Mono',monospace; font-size:15px; color:var(--gold); white-space:nowrap; }
+        .rs-root .balance-value .cr{ color:var(--teal); font-size:11px; margin-left:6px; }
+
+        /* ---------- Layout ---------- */
+        .rs-root .layout{ max-width:1180px; margin:0 auto; display:flex; gap:0; align-items:flex-start; }
+        .rs-root .sidebar{
+          width:210px; flex-shrink:0;
+          position:sticky; top:53px;
+          padding:32px 12px 60px 32px;
+          font-family:'IBM Plex Mono',monospace;
+          font-size:12.5px;
+        }
+        .rs-root .sidebar a{
+          display:block; color:var(--text-muted); text-decoration:none;
+          padding:7px 0; border-left:2px solid transparent; padding-left:12px;
+        }
+        .rs-root .sidebar a:hover, .rs-root .sidebar a.active{ color:var(--gold); border-left-color:var(--gold); }
+        .rs-root main{ flex:1; min-width:0; padding:32px 32px 80px; }
+
+        .rs-root section{ padding-top:14px; margin-bottom:56px; scroll-margin-top:64px; }
+        .rs-root .section-head{ display:flex; align-items:baseline; gap:14px; margin-bottom:6px; }
+        .rs-root .section-code{ font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--gold-dim); }
+        .rs-root section h2{ font-size:22px; }
+        .rs-root .section-sub{ color:var(--text-muted); font-size:13.5px; margin-top:6px; max-width:640px; }
+
+        /* ---------- Ledger group / entries ---------- */
+        .rs-root .ledger-group{ margin-top:26px; }
+        .rs-root .ledger-group-title{
+          font-family:'IBM Plex Mono',monospace;
+          font-size:11px; letter-spacing:0.1em; text-transform:uppercase;
+          color:var(--teal); margin-bottom:8px; padding-bottom:6px;
+          border-bottom:1px solid var(--hair);
+        }
+        .rs-root .entry{
+          display:flex; align-items:flex-start; gap:14px;
+          padding:11px 4px; border-bottom:1px solid var(--hair);
+        }
+        .rs-root .entry:hover{ background:rgba(201,162,39,0.04); }
+        .rs-root .entry input[type=checkbox]{
+          appearance:none; -webkit-appearance:none;
+          width:16px; height:16px; margin-top:3px; flex-shrink:0;
+          border:1px solid var(--border); background:var(--panel);
+          cursor:pointer; position:relative;
+        }
+        .rs-root .entry input[type=checkbox]:checked{ background:var(--gold); border-color:var(--gold); }
+        .rs-root .entry input[type=checkbox]:checked::after{
+          content:"✓"; position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+          font-size:11px; color:var(--bg); font-weight:600;
+        }
+        .rs-root .entry-body{ flex:1; }
+        .rs-root .entry-top{ display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
+        .rs-root .entry-code{ font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--gold-dim); }
+        .rs-root .entry-title{ font-weight:600; font-size:14.5px; }
+        .rs-root .entry.done .entry-title{ color:var(--text-muted); text-decoration:line-through; text-decoration-color:var(--border); }
+        .rs-root .entry-desc{ color:var(--text-muted); font-size:13px; margin-top:3px; }
+        .rs-root details.entry-detail{ margin-top:6px; }
+        .rs-root details.entry-detail summary{
+          cursor:pointer; font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--teal);
+          list-style:none;
+        }
+        .rs-root details.entry-detail summary::-webkit-details-marker{ display:none; }
+        .rs-root details.entry-detail summary::before{ content:"+ detail"; }
+        .rs-root details.entry-detail[open] summary::before{ content:"– detail"; }
+        .rs-root details.entry-detail p{ font-size:13px; color:var(--text-muted); margin:8px 0 0; max-width:600px; }
+
+        /* ---------- Story bank cards ---------- */
+        .rs-root .story-grid{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:22px; }
+        @media (max-width:760px){ .rs-root .story-grid{ grid-template-columns:1fr; } }
+        .rs-root .story-card{
+          background:var(--panel); border:1px solid var(--hair); padding:16px 18px;
+        }
+        .rs-root .story-card h3{ font-size:14.5px; color:var(--paper); margin-bottom:6px; }
+        .rs-root .story-card .tag{ font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--gold); letter-spacing:.08em; text-transform:uppercase; }
+        .rs-root .story-card textarea{
+          width:100%; margin-top:10px; min-height:70px; resize:vertical;
+          background:var(--bg); border:1px solid var(--hair); color:var(--text);
+          font-family:'Inter',sans-serif; font-size:12.5px; padding:8px; border-radius:var(--radius);
+        }
+        .rs-root .story-card textarea:focus{ border-color:var(--gold); }
+
+        /* ---------- Resource list ---------- */
+        .rs-root .resource-list{ margin-top:20px; }
+        .rs-root .resource{
+          display:flex; justify-content:space-between; gap:16px;
+          padding:10px 0; border-bottom:1px solid var(--hair);
+          font-size:13.5px;
+        }
+        .rs-root .resource span.rtype{ font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--text-muted); white-space:nowrap; }
+
+        .rs-root footer{
+          max-width:1180px; margin:0 auto; padding:30px 32px 60px;
+          border-top:1px solid var(--border);
+          font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--text-muted);
+          display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px;
+        }
+
+        /* ---------- Responsive ---------- */
+        @media (max-width: 880px){
+          .rs-root .layout{ flex-direction:column; }
+          .rs-root .sidebar{
+            position:static; width:100%; padding:16px 32px; display:flex; gap:4px 16px; flex-wrap:wrap;
+            border-bottom:1px solid var(--border);
+          }
+          .rs-root .sidebar a{ padding:6px 0; }
+          .rs-root main{ padding:24px 20px 60px; }
+          .rs-root .statement-header{ padding:36px 20px 22px; }
+        }
     </style>
 </head>
 <body class="p-6 md:p-12">
@@ -19,7 +226,7 @@
         </header>
 
         <div class="relative mb-8">
-            <input type="text" id="searchBar" placeholder="Search topics (e.g., 'SQL', 'Architecture')..." 
+            <input type="text" id="searchBar" placeholder="Search topics (e.g., 'SQL', 'Architecture')..."
                 class="w-full p-4 pl-12 rounded-xl border border-slate-200 shadow-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all">
             <svg class="w-6 h-6 absolute left-4 top-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
@@ -28,6 +235,246 @@
 
         <div id="linksGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
             </div>
+    </div>
+
+    <!-- ==================== Readiness Statement (appended) ==================== -->
+    <div class="rs-root">
+      <header class="statement-header">
+        <div class="eyebrow">Readiness Statement · No. 001</div>
+        <h1>Principal Java Engineer — Payments Track</h1>
+        <div class="statement-meta">
+          <div>Domain<span>Payments / Payment Gateway</span></div>
+          <div>Location<span>Ho Chi Minh City</span></div>
+          <div>Target comp<span>65M/mo × 13</span></div>
+          <div>Interview date<span><input type="date" id="interviewDate" aria-label="Interview date"></span></div>
+          <div>Days remaining<span id="daysLeft" class="mono">—</span></div>
+        </div>
+      </header>
+
+      <div class="balance-bar">
+        <div class="balance-inner">
+          <span class="balance-label">Running balance</span>
+          <div class="balance-track"><div class="balance-fill" id="balanceFill"></div></div>
+          <span class="balance-value mono" id="balanceValue">0 / 0 cleared<span class="cr">CR</span></span>
+        </div>
+      </div>
+
+      <div class="layout">
+        <nav class="sidebar" id="sidebar">
+          <a href="#overview">Overview</a>
+          <a href="#week1">Week 1 — Foundations</a>
+          <a href="#week2">Week 2 — System Design</a>
+          <a href="#week3">Week 3 — Leadership</a>
+          <a href="#week4">Week 4 — Mocks</a>
+          <a href="#checklist">Final Checklist</a>
+          <a href="#resources">Resources</a>
+        </nav>
+
+        <main>
+
+          <section id="overview">
+            <div class="section-head"><span class="section-code">§00</span><h2>Overview</h2></div>
+            <p class="section-sub">A four-week ledger, not a syllabus. Every line you clear adds to the balance above. The
+            goal isn't to become a specialist overnight — it's to be credible on fundamentals while your requirement-shaping
+            and roadmap-ownership strength does the actual differentiating.</p>
+          </section>
+
+          <section id="week1">
+            <div class="section-head"><span class="section-code">§01</span><h2>Week 1 — Foundations &amp; Domain Vocabulary</h2></div>
+            <p class="section-sub">Stop being technically vague on 4–5 core topics. Get fluent in payments vocabulary — this is where you can move fast and look strong fast.</p>
+
+            <div class="ledger-group">
+              <div class="ledger-group-title">Java Core</div>
+              <div class="entry" data-id="wk1-01"><input type="checkbox" id="wk1-01"><div class="entry-body">
+                <div class="entry-top"><span class="entry-code">WK1-J01</span><span class="entry-title">Concurrency fundamentals</span></div>
+                <div class="entry-desc">synchronized vs Lock, thread pools, CompletableFuture, common race-condition patterns.</div>
+              </div></div>
+              <div class="entry" data-id="wk1-02"><input type="checkbox" id="wk1-02"><div class="entry-body">
+                <div class="entry-top"><span class="entry-code">WK1-J02</span><span class="entry-title">JVM memory &amp; GC (conceptual)</span></div>
+                <div class="entry-desc">Explain trade-offs between GC types (G1, ZGC) — you need to reason, not tune flags.</div>
+              </div></div>
+              <div class="entry" data-id="wk1-03"><input type="checkbox" id="wk1-03"><div class="entry-body">
+                <div class="entry-top"><span class="entry-code">WK1-J03</span><span class="entry-title">Design principles &amp; patterns</span></div>
+                <div class="entry-desc">SOLID, plus 5–6 patterns that show up in payments: Strategy, Chain of Responsibility, Circuit Breaker, Saga, Idempotent Consumer.</div>
+              </div></div>
+            </div>
+
+            <div class="ledger-group">
+              <div class="ledger-group-title">Spring / Microservices</div>
+              <div class="entry" data-id="wk1-04"><input type="checkbox" id="wk1-04"><div class="entry-body">
+                <div class="entry-top"><span class="entry-code">WK1-S01</span><span class="entry-title">Spring Boot vs Spring Cloud</span></div>
+                <div class="entry-desc">What problem each layer actually solves.</div>
+              </div></div>
+              <div class="entry" data-id="wk1-05"><input type="checkbox" id="wk1-05"><div class="entry-body">
+                <div class="entry-top"><span class="entry-code">WK1-S02</span><span class="entry-title">Service communication choices</span></div>
+                <div class="entry-desc">REST vs gRPC vs async messaging (Kafka/RabbitMQ) — and when you'd choose which for a payment flow.</div>
+              </div></div>
+              <div class="entry" data-id="wk1-06"><input type="checkbox" id="wk1-06"><div class="entry-body">
+                <div class="entry-top"><span class="entry-code">WK1-S03</span><span class="entry-title">Resilience patterns</span></div>
+                <div class="entry-desc">Circuit breaker, retry with backoff, bulkhead, timeout — a stuck downstream call can cascade into a payment outage.</div>
+              </div></div>
+            </div>
+
+            <div class="ledger-group">
+              <div class="ledger-group-title">Payments Vocabulary</div>
+              <div class="entry" data-id="wk1-07"><input type="checkbox" id="wk1-07"><div class="entry-body">
+                <div class="entry-top"><span class="entry-code">WK1-P01</span><span class="entry-title">ISO 8583 vs modern REST/JSON payment APIs</span></div>
+                <div class="entry-desc">Legacy card messaging standard vs how gateways talk today.</div>
+              </div></div>
+              <div class="entry" data-id="wk1-08"><input type="checkbox" id="wk1-08"><div class="entry-body">
+                <div class="entry-top"><span class="entry-code">WK1-P02</span><span class="entry-title">Idempotency keys</span></div>
+                <div class="entry-desc">The single most-asked concept in payment gateway interviews.</div>
+              </div></div>
+              <div class="entry" data-id="wk1-09"><input type="checkbox" id="wk1-09"><div class="entry-body">
+                <div class="entry-top"><span class="entry-code">WK1-P03</span><span class="entry-title">Ledger, reconciliation, settlement vs clearing</span></div>
+                <div class="entry-desc">Double-entry ledger mechanics and what settlement actually means downstream.</div>
+              </div></div>
+              <div class="entry" data-id="wk1-10"><input type="checkbox" id="wk1-10"><div class="entry-body">
+                <div class="entry-top"><span class="entry-code">WK1-P04</span><span class="entry-title">PCI-DSS basics</span></div>
+                <div class="entry-desc">Tokenization, no raw PAN storage, encryption at rest and in transit.</div>
+              </div></div>
+              <div class="entry" data-id="wk1-11"><input type="checkbox" id="wk1-11"><div class="entry-body">
+                <div class="entry-top"><span class="entry-code">WK1-P05</span><span class="entry-title">2PC vs Saga</span></div>
+                <div class="entry-desc">Distributed transactions — Saga is what real payment systems use in production.</div>
+              </div></div>
+              <div class="entry" data-id="wk1-12"><input type="checkbox" id="wk1-12"><div class="entry-body">
+                <div class="entry-top"><span class="entry-code">WK1-P06</span><span class="entry-title">Vietnam-specific context</span></div>
+                <div class="entry-desc">Napas 24/7, VietQR, SBV compliance basics, e-KYC — local awareness a generic candidate won't have.</div>
+              </div></div>
+            </div>
+          </section>
+
+          <section id="week2">
+            <div class="section-head"><span class="section-code">§02</span><h2>Week 2 — System Design for Payments</h2></div>
+            <p class="section-sub">Highest-leverage week. Practice designing out loud, 45 minutes each, narrating trade-offs like someone who's owned production incidents. For every design, explicitly state the business requirement behind each technical choice — that's your differentiator.</p>
+
+            <div class="ledger-group">
+              <div class="entry" data-id="wk2-01"><input type="checkbox" id="wk2-01"><div class="entry-body">
+                <div class="entry-top"><span class="entry-code">WK2-D01</span><span class="entry-title">Design a payment gateway</span></div>
+                <div class="entry-desc">Client → auth → risk/fraud check → ledger write → settlement, with idempotency and retry-safety.</div>
+                <details class="entry-detail"><summary></summary><p>Cover: consistency model, failure modes, idempotency, what you'd alert on, and how you'd roll it out safely (canary, feature flag, dark launch).</p></details>
+              </div></div>
+              <div class="entry" data-id="wk2-02"><input type="checkbox" id="wk2-02"><div class="entry-body">
+                <div class="entry-top"><span class="entry-code">WK2-D02</span><span class="entry-title">Design a ledger / reconciliation system</span></div>
+                <div class="entry-desc">Guarantee no double-charge or lost transaction across service failures.</div>
+                <details class="entry-detail"><summary></summary><p>Think about write-ahead logs, exactly-once vs at-least-once delivery, and reconciliation jobs as a safety net, not the primary guarantee.</p></details>
+              </div></div>
+              <div class="entry" data-id="wk2-03"><input type="checkbox" id="wk2-03"><div class="entry-body">
+                <div class="entry-top"><span class="entry-code">WK2-D03</span><span class="entry-title">Design a high-availability transaction processor</span></div>
+                <div class="entry-desc">Handling downstream bank/partner outages gracefully.</div>
+                <details class="entry-detail"><summary></summary><p>Bring in bulkheads and circuit breakers here — tie the pattern back to a concrete partner-outage scenario.</p></details>
+              </div></div>
+              <div class="entry" data-id="wk2-04"><input type="checkbox" id="wk2-04"><div class="entry-body">
+                <div class="entry-top"><span class="entry-code">WK2-D04</span><span class="entry-title">Design a fraud/risk scoring pipeline</span></div>
+                <div class="entry-desc">Sync vs async scoring, and the latency budget trade-off between the two.</div>
+              </div></div>
+            </div>
+          </section>
+
+          <section id="week3">
+            <div class="section-head"><span class="section-code">§03</span><h2>Week 3 — Leadership, Behavioral &amp; Story Bank</h2></div>
+            <p class="section-sub">Your strongest week — invest heavily. Build 6–8 sharp STAR stories, two minutes each, not rambling. Use the fields below to draft each one directly.</p>
+
+            <div class="story-grid">
+              <div class="story-card">
+                <span class="tag">Requirement shaping</span>
+                <h3>Caught or corrected a requirement early</h3>
+                <textarea placeholder="Situation → your specific action → quantified outcome → what you'd change"></textarea>
+              </div>
+              <div class="story-card">
+                <span class="tag">Roadmap ownership</span>
+                <h3>Drove a decision under ambiguity or conflicting priorities</h3>
+                <textarea placeholder="Situation → your specific action → quantified outcome → what you'd change"></textarea>
+              </div>
+              <div class="story-card">
+                <span class="tag">Incident leadership</span>
+                <h3>Identified and mitigated a production risk</h3>
+                <textarea placeholder="Situation → your specific action → quantified outcome → what you'd change"></textarea>
+              </div>
+              <div class="story-card">
+                <span class="tag">Influence</span>
+                <h3>Moved people without direct authority</h3>
+                <textarea placeholder="Situation → your specific action → quantified outcome → what you'd change"></textarea>
+              </div>
+              <div class="story-card">
+                <span class="tag">Mentorship</span>
+                <h3>Leveled up an engineer or team</h3>
+                <textarea placeholder="Situation → your specific action → quantified outcome → what you'd change"></textarea>
+              </div>
+              <div class="story-card">
+                <span class="tag">Trade-off judgment</span>
+                <h3>Chose "good enough now" over "perfect later"</h3>
+                <textarea placeholder="Situation → your specific action → quantified outcome → what you'd change"></textarea>
+              </div>
+              <div class="story-card">
+                <span class="tag">Pushback</span>
+                <h3>Disagreed with a stakeholder and the outcome</h3>
+                <textarea placeholder="Situation → your specific action → quantified outcome → what you'd change"></textarea>
+              </div>
+              <div class="story-card">
+                <span class="tag">Narrative</span>
+                <h3>3-min "how I think about system design" thread</h3>
+                <textarea placeholder="Business requirement → non-functional requirements (compliance, latency, availability) → architecture choice"></textarea>
+              </div>
+            </div>
+            <p class="section-sub" style="margin-top:16px;">Note: text you type here stays only in this browser tab's memory — it won't be saved on reload inside a Claude preview. Once this page is hosted on GitHub Pages and opened normally, your entries and checkboxes persist automatically between visits.</p>
+          </section>
+
+          <section id="week4">
+            <div class="section-head"><span class="section-code">§04</span><h2>Week 4 — Mock Interviews &amp; Integration</h2></div>
+            <p class="section-sub">Simulate real conditions. Don't cram new topics this week — consolidate.</p>
+            <div class="ledger-group">
+              <div class="entry" data-id="wk4-01"><input type="checkbox" id="wk4-01"><div class="entry-body">
+                <div class="entry-top"><span class="entry-code">WK4-M01</span><span class="entry-title">2–3 full mock interviews</span></div>
+                <div class="entry-desc">Technical + behavioral, recorded if possible — review for rambling or hedging.</div>
+              </div></div>
+              <div class="entry" data-id="wk4-02"><input type="checkbox" id="wk4-02"><div class="entry-body">
+                <div class="entry-top"><span class="entry-code">WK4-M02</span><span class="entry-title">Company &amp; product research</span></div>
+                <div class="entry-desc">Their product, recent news, tech stack if public, regulatory posture.</div>
+              </div></div>
+              <div class="entry" data-id="wk4-03"><input type="checkbox" id="wk4-03"><div class="entry-body">
+                <div class="entry-top"><span class="entry-code">WK4-M03</span><span class="entry-title">4–5 questions to ask them</span></div>
+                <div class="entry-desc">About architecture maturity, tech debt, how roadmap decisions get made.</div>
+              </div></div>
+              <div class="entry" data-id="wk4-04"><input type="checkbox" id="wk4-04"><div class="entry-body">
+                <div class="entry-top"><span class="entry-code">WK4-M04</span><span class="entry-title">Salary benchmarking</span></div>
+                <div class="entry-desc">Ground the 65M/13-month conversation in real Principal-level HCMC fintech data.</div>
+              </div></div>
+            </div>
+          </section>
+
+          <section id="checklist">
+            <div class="section-head"><span class="section-code">§05</span><h2>Final Self-Check</h2></div>
+            <p class="section-sub">Clear every line before you walk in.</p>
+            <div class="ledger-group">
+              <div class="entry" data-id="fc-01"><input type="checkbox" id="fc-01"><div class="entry-body"><div class="entry-top"><span class="entry-code">FC-01</span><span class="entry-title">Explain idempotency in payments without hesitation</span></div></div></div>
+              <div class="entry" data-id="fc-02"><input type="checkbox" id="fc-02"><div class="entry-body"><div class="entry-top"><span class="entry-code">FC-02</span><span class="entry-title">Whiteboard a payment gateway design in 45 min unaided</span></div></div></div>
+              <div class="entry" data-id="fc-03"><input type="checkbox" id="fc-03"><div class="entry-body"><div class="entry-top"><span class="entry-code">FC-03</span><span class="entry-title">6+ STAR stories memorized to key phrases, not scripts</span></div></div></div>
+              <div class="entry" data-id="fc-04"><input type="checkbox" id="fc-04"><div class="entry-body"><div class="entry-top"><span class="entry-code">FC-04</span><span class="entry-title">Explain Saga vs 2PC and when each applies</span></div></div></div>
+              <div class="entry" data-id="fc-05"><input type="checkbox" id="fc-05"><div class="entry-body"><div class="entry-top"><span class="entry-code">FC-05</span><span class="entry-title">3 Vietnam-specific fintech/regulatory terms cold</span></div></div></div>
+              <div class="entry" data-id="fc-06"><input type="checkbox" id="fc-06"><div class="entry-body"><div class="entry-top"><span class="entry-code">FC-06</span><span class="entry-title">4–5 questions ready to ask the interviewer</span></div></div></div>
+              <div class="entry" data-id="fc-07"><input type="checkbox" id="fc-07"><div class="entry-body"><div class="entry-top"><span class="entry-code">FC-07</span><span class="entry-title">State a trade-off and the business reason behind it in one breath</span></div></div></div>
+            </div>
+          </section>
+
+          <section id="resources">
+            <div class="section-head"><span class="section-code">§06</span><h2>Resources</h2></div>
+            <div class="resource-list">
+              <div class="resource"><span>Designing Data-Intensive Applications — Kleppmann</span><span class="rtype mono">BOOK</span></div>
+              <div class="resource"><span>System Design Interview, Vol. 1 &amp; 2 — Alex Xu</span><span class="rtype mono">BOOK</span></div>
+              <div class="resource"><span>Stripe Engineering Blog</span><span class="rtype mono">BLOG</span></div>
+              <div class="resource"><span>PayPal Tech Blog</span><span class="rtype mono">BLOG</span></div>
+              <div class="resource"><span>Baeldung — Spring &amp; Java refreshers</span><span class="rtype mono">REF</span></div>
+            </div>
+          </section>
+
+        </main>
+      </div>
+
+      <footer>
+        <span>Readiness Statement · Personal use only</span>
+        <span id="footerDate" class="mono"></span>
+      </footer>
     </div>
 
     <script>
@@ -68,6 +515,92 @@
                 render(results);
             }
         });
+    </script>
+
+    <script>
+    // ---------- Readiness Statement behavior ----------
+    (function(){
+      var STORAGE_KEY = 'readiness-ledger-v1';
+      var checkboxes = Array.prototype.slice.call(document.querySelectorAll('.rs-root .entry input[type=checkbox]'));
+      var textareas = Array.prototype.slice.call(document.querySelectorAll('.rs-root .story-card textarea'));
+      var dateInput = document.getElementById('interviewDate');
+
+      function loadState(){
+        try{
+          var raw = localStorage.getItem(STORAGE_KEY);
+          return raw ? JSON.parse(raw) : {};
+        }catch(e){ return {}; }
+      }
+      function saveState(state){
+        try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+      }
+
+      var state = loadState();
+
+      checkboxes.forEach(function(cb){
+        var id = cb.id;
+        if(state.checks && state.checks[id]){
+          cb.checked = true;
+          cb.closest('.entry').classList.add('done');
+        }
+        cb.addEventListener('change', function(){
+          if(!state.checks) state.checks = {};
+          state.checks[id] = cb.checked;
+          cb.closest('.entry').classList.toggle('done', cb.checked);
+          saveState(state);
+          updateBalance();
+        });
+      });
+
+      textareas.forEach(function(ta, idx){
+        var key = 'story_' + idx;
+        if(state.stories && state.stories[key]) ta.value = state.stories[key];
+        ta.addEventListener('input', function(){
+          if(!state.stories) state.stories = {};
+          state.stories[key] = ta.value;
+          saveState(state);
+        });
+      });
+
+      if(state.interviewDate){ dateInput.value = state.interviewDate; }
+      dateInput.addEventListener('change', function(){
+        state.interviewDate = dateInput.value;
+        saveState(state);
+        updateDays();
+      });
+
+      function updateBalance(){
+        var total = checkboxes.length;
+        var done = checkboxes.filter(function(cb){ return cb.checked; }).length;
+        document.getElementById('balanceValue').innerHTML = done + ' / ' + total + ' cleared<span class="cr">CR</span>';
+        document.getElementById('balanceFill').style.width = (total ? (done/total*100) : 0) + '%';
+      }
+
+      function updateDays(){
+        var el = document.getElementById('daysLeft');
+        if(!dateInput.value){ el.textContent = '—'; return; }
+        var target = new Date(dateInput.value + 'T00:00:00');
+        var now = new Date();
+        now.setHours(0,0,0,0);
+        var diff = Math.round((target - now) / 86400000);
+        el.textContent = diff >= 0 ? diff + ' d' : (Math.abs(diff) + ' d overdue');
+      }
+
+      // active sidebar link on scroll
+      var links = Array.prototype.slice.call(document.querySelectorAll('.rs-root .sidebar a'));
+      var sections = links.map(function(l){ return document.querySelector(l.getAttribute('href')); });
+      window.addEventListener('scroll', function(){
+        var pos = window.scrollY + 100;
+        var current = sections[0];
+        sections.forEach(function(s){ if(s && s.offsetTop <= pos) current = s; });
+        links.forEach(function(l){ l.classList.toggle('active', current && l.getAttribute('href') === '#' + current.id); });
+      });
+
+      document.getElementById('footerDate').textContent = 'Rendered ' + new Date().toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'});
+
+      updateBalance();
+      updateDays();
+    })();
     </script>
 </body>
 </html>
