@@ -141,7 +141,13 @@
           font-size:11px; letter-spacing:0.1em; text-transform:uppercase;
           color:var(--teal); margin-bottom:8px; padding-bottom:6px;
           border-bottom:1px solid var(--hair);
+          display:flex; justify-content:space-between; align-items:baseline; gap:12px;
         }
+        .rs-root .study-link{
+          font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:0.06em;
+          text-transform:none; color:var(--gold); text-decoration:none; white-space:nowrap;
+        }
+        .rs-root .study-link:hover{ color:var(--teal); text-decoration:underline; }
         .rs-root .entry{
           display:flex; align-items:flex-start; gap:14px;
           padding:11px 4px; border-bottom:1px solid var(--hair);
@@ -284,7 +290,7 @@
             <p class="section-sub">Stop being technically vague on 4–5 core topics. Get fluent in payments vocabulary — this is where you can move fast and look strong fast.</p>
 
             <div class="ledger-group">
-              <div class="ledger-group-title">Java Core</div>
+              <div class="ledger-group-title">Java Core<a class="study-link" href="knowledge/java-core.html">study guide →</a></div>
               <div class="entry" data-id="wk1-01"><input type="checkbox" id="wk1-01"><div class="entry-body">
                 <div class="entry-top"><span class="entry-code">WK1-J01</span><span class="entry-title">Concurrency fundamentals</span></div>
                 <div class="entry-desc">synchronized vs Lock, thread pools, CompletableFuture, common race-condition patterns.</div>
@@ -300,7 +306,7 @@
             </div>
 
             <div class="ledger-group">
-              <div class="ledger-group-title">Spring / Microservices</div>
+              <div class="ledger-group-title">Spring / Microservices<a class="study-link" href="knowledge/spring-microservices.html">study guide →</a></div>
               <div class="entry" data-id="wk1-04"><input type="checkbox" id="wk1-04"><div class="entry-body">
                 <div class="entry-top"><span class="entry-code">WK1-S01</span><span class="entry-title">Spring Boot vs Spring Cloud</span></div>
                 <div class="entry-desc">What problem each layer actually solves.</div>
@@ -316,7 +322,7 @@
             </div>
 
             <div class="ledger-group">
-              <div class="ledger-group-title">Payments Vocabulary</div>
+              <div class="ledger-group-title">Payments Vocabulary<a class="study-link" href="knowledge/payments-vocabulary.html">study guide →</a></div>
               <div class="entry" data-id="wk1-07"><input type="checkbox" id="wk1-07"><div class="entry-body">
                 <div class="entry-top"><span class="entry-code">WK1-P01</span><span class="entry-title">ISO 8583 vs modern REST/JSON payment APIs</span></div>
                 <div class="entry-desc">Legacy card messaging standard vs how gateways talk today.</div>
@@ -350,22 +356,22 @@
 
             <div class="ledger-group">
               <div class="entry" data-id="wk2-01"><input type="checkbox" id="wk2-01"><div class="entry-body">
-                <div class="entry-top"><span class="entry-code">WK2-D01</span><span class="entry-title">Design a payment gateway</span></div>
+                <div class="entry-top"><span class="entry-code">WK2-D01</span><span class="entry-title">Design a payment gateway</span><a class="study-link" href="knowledge/design-payment-gateway.html">study guide →</a></div>
                 <div class="entry-desc">Client → auth → risk/fraud check → ledger write → settlement, with idempotency and retry-safety.</div>
                 <details class="entry-detail"><summary></summary><p>Cover: consistency model, failure modes, idempotency, what you'd alert on, and how you'd roll it out safely (canary, feature flag, dark launch).</p></details>
               </div></div>
               <div class="entry" data-id="wk2-02"><input type="checkbox" id="wk2-02"><div class="entry-body">
-                <div class="entry-top"><span class="entry-code">WK2-D02</span><span class="entry-title">Design a ledger / reconciliation system</span></div>
+                <div class="entry-top"><span class="entry-code">WK2-D02</span><span class="entry-title">Design a ledger / reconciliation system</span><a class="study-link" href="knowledge/design-ledger-reconciliation.html">study guide →</a></div>
                 <div class="entry-desc">Guarantee no double-charge or lost transaction across service failures.</div>
                 <details class="entry-detail"><summary></summary><p>Think about write-ahead logs, exactly-once vs at-least-once delivery, and reconciliation jobs as a safety net, not the primary guarantee.</p></details>
               </div></div>
               <div class="entry" data-id="wk2-03"><input type="checkbox" id="wk2-03"><div class="entry-body">
-                <div class="entry-top"><span class="entry-code">WK2-D03</span><span class="entry-title">Design a high-availability transaction processor</span></div>
+                <div class="entry-top"><span class="entry-code">WK2-D03</span><span class="entry-title">Design a high-availability transaction processor</span><a class="study-link" href="knowledge/design-ha-transaction-processor.html">study guide →</a></div>
                 <div class="entry-desc">Handling downstream bank/partner outages gracefully.</div>
                 <details class="entry-detail"><summary></summary><p>Bring in bulkheads and circuit breakers here — tie the pattern back to a concrete partner-outage scenario.</p></details>
               </div></div>
               <div class="entry" data-id="wk2-04"><input type="checkbox" id="wk2-04"><div class="entry-body">
-                <div class="entry-top"><span class="entry-code">WK2-D04</span><span class="entry-title">Design a fraud/risk scoring pipeline</span></div>
+                <div class="entry-top"><span class="entry-code">WK2-D04</span><span class="entry-title">Design a fraud/risk scoring pipeline</span><a class="study-link" href="knowledge/design-fraud-risk-pipeline.html">study guide →</a></div>
                 <div class="entry-desc">Sync vs async scoring, and the latency budget trade-off between the two.</div>
               </div></div>
             </div>
@@ -483,6 +489,15 @@
             { title: "JooQ Explainer (compare with JPA and Mybatis)", path: "knowledge/jooq-explainer.html", tags: ["backend", "architecture", "jooq"] },
             { title: "OAuth2", path: "knowledge/oauth2-explainer.html", tags: ["backend", "authorization", "authentication"] },
             { title: "OIDC", path: "knowledge/oidc-explainer.html", tags: ["backend", "authorization", "authentication"] },
+            // --- Interview prep: Week 1 foundations ---
+            { title: "Java Core — Concurrency, JVM/GC, Patterns", path: "knowledge/java-core.html", tags: ["java", "concurrency", "jvm", "gc", "patterns", "interview"] },
+            { title: "Spring & Microservices — Boot vs Cloud, Comms, Resilience", path: "knowledge/spring-microservices.html", tags: ["spring", "microservices", "resilience", "kafka", "grpc", "interview"] },
+            { title: "Payments Vocabulary — ISO 8583, Idempotency, Ledger, PCI, Saga, Vietnam", path: "knowledge/payments-vocabulary.html", tags: ["payments", "idempotency", "ledger", "pci-dss", "saga", "napas", "vietqr", "interview"] },
+            // --- Interview prep: Week 2 system design ---
+            { title: "System Design — Payment Gateway", path: "knowledge/design-payment-gateway.html", tags: ["system design", "payments", "gateway", "idempotency", "saga", "interview"] },
+            { title: "System Design — Ledger & Reconciliation", path: "knowledge/design-ledger-reconciliation.html", tags: ["system design", "ledger", "reconciliation", "double-entry", "outbox", "interview"] },
+            { title: "System Design — High-Availability Transaction Processor", path: "knowledge/design-ha-transaction-processor.html", tags: ["system design", "high availability", "circuit breaker", "bulkhead", "resilience", "interview"] },
+            { title: "System Design — Fraud / Risk Scoring Pipeline", path: "knowledge/design-fraud-risk-pipeline.html", tags: ["system design", "fraud", "risk", "ml", "latency", "interview"] },
             // Add more entries as you create new HTML architecture
         ];
 

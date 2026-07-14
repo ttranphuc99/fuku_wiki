@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>System Design — Payment Gateway</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap');
+  :root{--bg:#0a0a0f;--surface:#12121a;--border:#1e1e2e;--text:#e0e0f0;--muted:#6b6b8a;--accent:#7c3aed;--c1:#00e5ff;--c2:#ff6b6b;--c3:#a8ff78;--c4:#ffd166;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;min-height:100vh;overflow-x:hidden;line-height:1.6;}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,229,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,0.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+  .container{max-width:1000px;margin:0 auto;padding:40px 24px 80px;position:relative;z-index:1;}
+  .back{font-family:'Space Mono',monospace;font-size:12px;color:var(--muted);text-decoration:none;letter-spacing:1px;}
+  .back:hover{color:var(--c1);}
+  header{margin:32px 0 44px;}
+  .tag{display:inline-block;font-family:'Space Mono',monospace;font-size:11px;color:var(--c1);border:1px solid var(--c1);padding:4px 12px;letter-spacing:3px;text-transform:uppercase;margin-bottom:20px;opacity:.8;}
+  h1{font-size:clamp(2rem,5vw,3.4rem);font-weight:800;line-height:1.05;letter-spacing:-1.5px;margin-bottom:14px;}
+  .subtitle{color:var(--muted);font-size:1rem;font-family:'Space Mono',monospace;}
+  .section-label{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:4px;text-transform:uppercase;color:var(--muted);margin:44px 0 16px;}
+  .card{background:var(--surface);border:1px solid var(--border);padding:26px 28px;margin-bottom:16px;}
+  .card h2{font-size:1.35rem;font-weight:800;letter-spacing:-.5px;margin-bottom:6px;}
+  .card p{font-size:.92rem;line-height:1.7;margin-bottom:12px;color:#c8c8dd;}
+  .card ul{list-style:none;margin:8px 0 12px;}
+  .card ul li{font-size:.9rem;line-height:1.7;padding-left:18px;position:relative;margin-bottom:5px;color:#c8c8dd;}
+  .card ul li::before{content:'→';position:absolute;left:0;color:var(--c1);opacity:.6;font-family:'Space Mono',monospace;font-size:.8rem;}
+  strong{color:#fff;}
+  .flow{font-family:'Space Mono',monospace;font-size:.78rem;line-height:2;color:#c0c0d8;background:#080810;border:1px solid var(--border);padding:18px;overflow-x:auto;white-space:pre;margin:6px 0 14px;}
+  .flow b{color:var(--c1);}
+  .req{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  @media(max-width:600px){.req{grid-template-columns:1fr;}}
+  .req .box{background:#080810;border:1px solid var(--border);padding:16px 18px;}
+  .req .box h4{font-family:'Space Mono',monospace;font-size:.68rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+  table{width:100%;border-collapse:collapse;font-size:.82rem;margin:8px 0;}
+  th{font-family:'Space Mono',monospace;font-size:.68rem;letter-spacing:2px;text-transform:uppercase;padding:10px 14px;text-align:left;border-bottom:1px solid var(--border);color:var(--muted);}
+  td{padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:top;line-height:1.5;color:#c8c8dd;}
+  td:first-child{font-weight:700;color:var(--muted);font-family:'Space Mono',monospace;font-size:.78rem;white-space:nowrap;}
+  tr:hover td{background:rgba(255,255,255,.015);}
+  .tips{background:linear-gradient(135deg,rgba(124,58,237,.08),rgba(0,229,255,.05));border:1px solid rgba(124,58,237,.3);padding:30px;margin-top:44px;}
+  .tips h2{font-size:1.25rem;font-weight:800;margin-bottom:18px;color:#c4b5fd;}
+  .tip{display:flex;gap:14px;margin-bottom:15px;align-items:flex-start;}
+  .tip .n{font-family:'Space Mono',monospace;font-size:.65rem;color:var(--accent);background:rgba(124,58,237,.2);padding:3px 8px;flex-shrink:0;margin-top:2px;letter-spacing:1px;}
+  .tip .txt{font-size:.9rem;line-height:1.65;color:#c0c0d8;}
+  @media(max-width:600px){.container{padding:24px 16px 60px;}}
+</style>
+</head>
+<body>
+<div class="container">
+  <a class="back" href="../index.html">&larr; back to Fuku Wiki</a>
+  <header>
+    <div class="tag">Week 2 · System Design · WK2-D01</div>
+    <h1>Design a Payment Gateway</h1>
+    <p class="subtitle">// client → auth → risk → ledger → settlement, retry-safe &amp; idempotent</p>
+  </header>
+
+  <div class="section-label">// 1 — clarify requirements first (always)</div>
+  <div class="card">
+    <div class="req">
+      <div class="box"><h4>Functional</h4>
+        <ul>
+          <li>Accept a charge, authorize, capture, refund</li>
+          <li>Multiple methods (card, VietQR, wallet)</li>
+          <li>Idempotent create + status query + webhooks</li>
+          <li>Immutable transaction history</li>
+        </ul>
+      </div>
+      <div class="box"><h4>Non-functional</h4>
+        <ul>
+          <li><strong>Correctness &gt; availability &gt; latency</strong> — never double-charge or lose a txn</li>
+          <li>p99 auth &lt; ~300ms; high availability</li>
+          <li>PCI-DSS; full auditability</li>
+          <li>Scale to peak (sale events, payday)</li>
+        </ul>
+      </div>
+    </div>
+    <p>State the ranking out loud: in payments, <strong>consistency of money movement is non-negotiable</strong>; you'll trade latency and even some availability before you'll risk a double-charge.</p>
+  </div>
+
+  <div class="section-label">// 2 — the request flow</div>
+  <div class="card">
+    <div class="flow"><b>Client</b> → API Gateway (authN, rate-limit, TLS)
+      → <b>Payment Service</b> (validate + idempotency check)
+      → <b>Risk/Fraud</b> (sync score, latency-budgeted)
+      → <b>Acquirer/Bank</b> (authorize)     ─┐
+      → <b>Ledger</b> (append auth hold)       │ same logical txn
+      → emit <b>PaymentAuthorized</b> event  ─┘
+      → async: capture, settlement, notify, analytics</div>
+    <ul>
+      <li><strong>Idempotency at the front door:</strong> every create carries an <code>Idempotency-Key</code>; store it with the result so retries replay, not re-charge.</li>
+      <li><strong>State machine per payment:</strong> <code>CREATED → AUTHORIZED → CAPTURED → SETTLED</code> (or <code>DECLINED / FAILED / REFUNDED</code>). Persist transitions; they drive recovery.</li>
+      <li><strong>Outbox pattern:</strong> write the ledger row and the "publish event" intent in one DB transaction, then a relay ships it to Kafka — so you never post to the ledger without emitting the event, or vice versa.</li>
+    </ul>
+  </div>
+
+  <div class="section-label">// 3 — key decisions &amp; trade-offs</div>
+  <div class="card">
+    <table>
+      <tr><th>Decision</th><th>Choice &amp; why</th></tr>
+      <tr><td>Consistency</td><td>Strong for the ledger write (single-partition, ACID); eventual for downstream (settlement, notifications) via events.</td></tr>
+      <tr><td>Distributed txn</td><td><strong>Saga</strong> with compensations (release hold / reverse), not 2PC.</td></tr>
+      <tr><td>Delivery</td><td>At-least-once + idempotent consumers = effectively exactly-once processing.</td></tr>
+      <tr><td>Data store</td><td>Strongly-consistent RDBMS for ledger/txn state; the ledger is append-only double-entry.</td></tr>
+      <tr><td>Resilience</td><td>Timeout + circuit breaker + bulkhead around each acquirer; fallback = queue for retry.</td></tr>
+    </table>
+  </div>
+
+  <div class="section-label">// 4 — failure modes &amp; recovery</div>
+  <div class="card">
+    <ul>
+      <li><strong>Lost response after a successful auth:</strong> idempotency key + persisted state machine → retry returns the existing result.</li>
+      <li><strong>Acquirer timeout (unknown outcome):</strong> mark <code>PENDING</code>, reconcile against the network settlement file; never assume success or failure.</li>
+      <li><strong>Crash mid-flow:</strong> recover from persisted state; outbox guarantees the event still ships.</li>
+      <li><strong>Partner outage:</strong> circuit breaker opens, requests queue, auto-recover on half-open.</li>
+    </ul>
+  </div>
+
+  <div class="section-label">// 5 — rollout &amp; observability</div>
+  <div class="card">
+    <p><strong>Ship it safely:</strong> feature flags, <strong>canary</strong> a small % of traffic, dark-launch the new path in shadow mode comparing against the old, and keep a fast rollback.</p>
+    <p><strong>Alert on money-movement signals, not just CPU:</strong></p>
+    <ul>
+      <li>Authorization success rate drop (per acquirer/method)</li>
+      <li>Latency p99 breach on the auth path</li>
+      <li>Ledger vs settlement reconciliation mismatch count</li>
+      <li>Pending/unknown transactions aging past threshold</li>
+      <li>Circuit-breaker open events, DLQ depth</li>
+    </ul>
+  </div>
+
+  <div class="tips">
+    <h2>⚡ Interview Talking Points</h2>
+    <div class="tip"><span class="n">01</span><div class="txt"><strong>Open by ranking non-functionals:</strong> "Before I draw anything — in a gateway, correctness of money movement beats availability beats latency. That ranking drives every choice I'm about to make."</div></div>
+    <div class="tip"><span class="n">02</span><div class="txt"><strong>Make idempotency + state machine the backbone:</strong> "The idempotency key plus a persisted payment state machine is what makes the whole thing retry-safe — a lost response never becomes a double-charge."</div></div>
+    <div class="tip"><span class="n">03</span><div class="txt"><strong>Use the outbox to sound production-hardened:</strong> "I write the ledger entry and the event-publish intent in one transaction via an outbox, so the ledger and the event stream can never diverge."</div></div>
+    <div class="tip"><span class="n">04</span><div class="txt"><strong>Name the unknown-outcome case:</strong> "The scary state isn't failure, it's <em>unknown</em> — an acquirer timeout. I mark it pending and let reconciliation resolve it; I never guess."</div></div>
+  </div>
+</div>
+</body>
+</html>

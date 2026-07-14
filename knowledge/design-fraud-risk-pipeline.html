@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>System Design — Fraud / Risk Scoring Pipeline</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap');
+  :root{--bg:#0a0a0f;--surface:#12121a;--border:#1e1e2e;--text:#e0e0f0;--muted:#6b6b8a;--accent:#7c3aed;--c1:#c4b5fd;--c2:#ff6b6b;--c3:#00e5ff;--c4:#a8ff78;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;min-height:100vh;overflow-x:hidden;line-height:1.6;}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(196,181,253,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(196,181,253,0.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+  .container{max-width:1000px;margin:0 auto;padding:40px 24px 80px;position:relative;z-index:1;}
+  .back{font-family:'Space Mono',monospace;font-size:12px;color:var(--muted);text-decoration:none;letter-spacing:1px;}
+  .back:hover{color:var(--c1);}
+  header{margin:32px 0 44px;}
+  .tag{display:inline-block;font-family:'Space Mono',monospace;font-size:11px;color:var(--c1);border:1px solid var(--c1);padding:4px 12px;letter-spacing:3px;text-transform:uppercase;margin-bottom:20px;opacity:.8;}
+  h1{font-size:clamp(2rem,5vw,3.4rem);font-weight:800;line-height:1.05;letter-spacing:-1.5px;margin-bottom:14px;}
+  .subtitle{color:var(--muted);font-size:1rem;font-family:'Space Mono',monospace;}
+  .section-label{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:4px;text-transform:uppercase;color:var(--muted);margin:44px 0 16px;}
+  .card{background:var(--surface);border:1px solid var(--border);padding:26px 28px;margin-bottom:16px;}
+  .card h2{font-size:1.35rem;font-weight:800;letter-spacing:-.5px;margin-bottom:6px;}
+  .card p{font-size:.92rem;line-height:1.7;margin-bottom:12px;color:#c8c8dd;}
+  .card ul{list-style:none;margin:8px 0 12px;}
+  .card ul li{font-size:.9rem;line-height:1.7;padding-left:18px;position:relative;margin-bottom:5px;color:#c8c8dd;}
+  .card ul li::before{content:'→';position:absolute;left:0;color:var(--c1);opacity:.6;font-family:'Space Mono',monospace;font-size:.8rem;}
+  strong{color:#fff;}
+  .flow{font-family:'Space Mono',monospace;font-size:.78rem;line-height:1.9;color:#c0c0d8;background:#080810;border:1px solid var(--border);padding:18px;overflow-x:auto;white-space:pre;margin:6px 0 14px;}
+  .flow b{color:var(--c1);}
+  table{width:100%;border-collapse:collapse;font-size:.82rem;margin:8px 0;}
+  th{font-family:'Space Mono',monospace;font-size:.68rem;letter-spacing:2px;text-transform:uppercase;padding:10px 14px;text-align:left;border-bottom:1px solid var(--border);color:var(--muted);}
+  td{padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:top;line-height:1.5;color:#c8c8dd;}
+  td:first-child{font-weight:700;color:var(--muted);font-family:'Space Mono',monospace;font-size:.78rem;white-space:nowrap;}
+  tr:hover td{background:rgba(255,255,255,.015);}
+  .tips{background:linear-gradient(135deg,rgba(124,58,237,.08),rgba(196,181,253,.05));border:1px solid rgba(124,58,237,.3);padding:30px;margin-top:44px;}
+  .tips h2{font-size:1.25rem;font-weight:800;margin-bottom:18px;color:#c4b5fd;}
+  .tip{display:flex;gap:14px;margin-bottom:15px;align-items:flex-start;}
+  .tip .n{font-family:'Space Mono',monospace;font-size:.65rem;color:var(--accent);background:rgba(124,58,237,.2);padding:3px 8px;flex-shrink:0;margin-top:2px;letter-spacing:1px;}
+  .tip .txt{font-size:.9rem;line-height:1.65;color:#c0c0d8;}
+  @media(max-width:600px){.container{padding:24px 16px 60px;}}
+</style>
+</head>
+<body>
+<div class="container">
+  <a class="back" href="../index.html">&larr; back to Fuku Wiki</a>
+  <header>
+    <div class="tag">Week 2 · System Design · WK2-D04</div>
+    <h1>Fraud / Risk Scoring Pipeline</h1>
+    <p class="subtitle">// sync vs async scoring and the latency-budget trade-off</p>
+  </header>
+
+  <div class="section-label">// 1 — the central tension</div>
+  <div class="card">
+    <h2>Latency budget vs catch rate</h2>
+    <p>Fraud scoring sits <em>inside</em> the authorization hot path, which has a tight latency budget (say ~300ms p99 total). The more signals and heavier the model, the better the catch rate — but the slower the decision. The design is fundamentally about <strong>splitting work between what must happen before you authorize and what can happen after.</strong></p>
+    <table>
+      <tr><th></th><th>Synchronous</th><th>Asynchronous</th></tr>
+      <tr><td>When</td><td>inline, before auth decision</td><td>after auth, streaming / batch</td></tr>
+      <tr><td>Budget</td><td>a few tens of ms</td><td>seconds → minutes</td></tr>
+      <tr><td>Does</td><td>fast rules, cached features, light model → approve / decline / step-up</td><td>heavy ML, graph analysis, cross-txn patterns → flag, hold, claw back</td></tr>
+      <tr><td>Goal</td><td>block obvious fraud, keep latency</td><td>catch sophisticated fraud, feed models</td></tr>
+    </table>
+  </div>
+
+  <div class="section-label">// 2 — the pipeline</div>
+  <div class="card">
+    <div class="flow"><b>Inline (sync, in auth path)</b>
+  txn → feature lookup (cache/feature store)
+      → rules engine + light model
+      → score → {approve | decline | <b>step-up (3DS/OTP)</b>}
+
+<b>Offline (async, off the hot path)</b>
+  txn event → stream processor → heavy ML + graph/velocity features
+            → risk flags, case management, model retraining</div>
+    <ul>
+      <li><strong>Feature store</strong> — precompute expensive features (user 30-day velocity, device history, merchant risk) offline; the sync path only does fast <em>lookups</em>, never heavy computation.</li>
+      <li><strong>Rules + model hybrid:</strong> deterministic rules for known-bad + hard limits (explainable, instant), ML score for the grey zone.</li>
+      <li><strong>Step-up</strong> instead of a binary allow/deny: when risk is medium, challenge (3-D Secure, OTP) rather than decline a good customer.</li>
+      <li><strong>Stream processing</strong> (Kafka + Flink/Kafka Streams) for real-time velocity checks and near-real-time flags that don't need to block auth.</li>
+    </ul>
+  </div>
+
+  <div class="section-label">// 3 — key decisions</div>
+  <div class="card">
+    <table>
+      <tr><td>Timeout policy</td><td>The scorer has a hard budget. On timeout, <strong>fail toward a safe default</strong> — for high-value txns maybe step-up; for low-value, approve-and-review. Don't hang the payment.</td></tr>
+      <tr><td>Consistency</td><td>Sync path reads a slightly stale feature store — acceptable; freshness comes from the async stream.</td></tr>
+      <tr><td>False positives</td><td>Blocking a legit customer has real business cost. Tune thresholds by segment; prefer step-up over decline.</td></tr>
+      <tr><td>Feedback loop</td><td>Chargeback / confirmed-fraud labels flow back to retrain models and update rules.</td></tr>
+      <tr><td>Explainability</td><td>Decisions may need to be justified (disputes, regulators) — keep reason codes, not just a black-box score.</td></tr>
+    </table>
+  </div>
+
+  <div class="section-label">// 4 — what to monitor</div>
+  <div class="card">
+    <ul>
+      <li>Scoring latency p99 vs budget; timeout/fallback rate</li>
+      <li>Approve / decline / step-up rates (sudden shifts = model or attack)</li>
+      <li>False-positive proxy (step-up abandonment) &amp; fraud/chargeback rate</li>
+      <li>Feature store freshness / staleness lag</li>
+    </ul>
+  </div>
+
+  <div class="tips">
+    <h2>⚡ Interview Talking Points</h2>
+    <div class="tip"><span class="n">01</span><div class="txt"><strong>Frame it as budget-splitting:</strong> "Fraud scoring is a latency-vs-catch-rate trade-off. I put fast rules and cached-feature lookups inline to block obvious fraud within budget, and push heavy ML and graph analysis to an async stream off the hot path."</div></div>
+    <div class="tip"><span class="n">02</span><div class="txt"><strong>Feature store is the trick:</strong> "The sync path can't compute a 30-day velocity in 20ms, so I precompute features offline and only do lookups inline. That's how you get rich signals without blowing the budget."</div></div>
+    <div class="tip"><span class="n">03</span><div class="txt"><strong>Step-up beats binary:</strong> "For medium risk I challenge with 3DS/OTP instead of declining — a false decline is lost revenue and an angry customer, so I design for step-up, not just allow/deny."</div></div>
+    <div class="tip"><span class="n">04</span><div class="txt"><strong>Have a timeout doctrine:</strong> "The scorer has a hard budget; on timeout I fail to a safe default keyed on transaction value — I never let risk scoring hang the authorization."</div></div>
+  </div>
+</div>
+</body>
+</html>

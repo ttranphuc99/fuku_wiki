@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>System Design — Ledger &amp; Reconciliation</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap');
+  :root{--bg:#0a0a0f;--surface:#12121a;--border:#1e1e2e;--text:#e0e0f0;--muted:#6b6b8a;--accent:#7c3aed;--c1:#a8ff78;--c2:#ff6b6b;--c3:#00e5ff;--c4:#ffd166;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;min-height:100vh;overflow-x:hidden;line-height:1.6;}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(168,255,120,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(168,255,120,0.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+  .container{max-width:1000px;margin:0 auto;padding:40px 24px 80px;position:relative;z-index:1;}
+  .back{font-family:'Space Mono',monospace;font-size:12px;color:var(--muted);text-decoration:none;letter-spacing:1px;}
+  .back:hover{color:var(--c1);}
+  header{margin:32px 0 44px;}
+  .tag{display:inline-block;font-family:'Space Mono',monospace;font-size:11px;color:var(--c1);border:1px solid var(--c1);padding:4px 12px;letter-spacing:3px;text-transform:uppercase;margin-bottom:20px;opacity:.8;}
+  h1{font-size:clamp(2rem,5vw,3.4rem);font-weight:800;line-height:1.05;letter-spacing:-1.5px;margin-bottom:14px;}
+  .subtitle{color:var(--muted);font-size:1rem;font-family:'Space Mono',monospace;}
+  .section-label{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:4px;text-transform:uppercase;color:var(--muted);margin:44px 0 16px;}
+  .card{background:var(--surface);border:1px solid var(--border);padding:26px 28px;margin-bottom:16px;}
+  .card h2{font-size:1.35rem;font-weight:800;letter-spacing:-.5px;margin-bottom:6px;}
+  .card p{font-size:.92rem;line-height:1.7;margin-bottom:12px;color:#c8c8dd;}
+  .card ul{list-style:none;margin:8px 0 12px;}
+  .card ul li{font-size:.9rem;line-height:1.7;padding-left:18px;position:relative;margin-bottom:5px;color:#c8c8dd;}
+  .card ul li::before{content:'→';position:absolute;left:0;color:var(--c1);opacity:.6;font-family:'Space Mono',monospace;font-size:.8rem;}
+  strong{color:#fff;}
+  .flow{font-family:'Space Mono',monospace;font-size:.78rem;line-height:1.9;color:#c0c0d8;background:#080810;border:1px solid var(--border);padding:18px;overflow-x:auto;white-space:pre;margin:6px 0 14px;}
+  .flow b{color:var(--c1);}
+  table{width:100%;border-collapse:collapse;font-size:.82rem;margin:8px 0;}
+  th{font-family:'Space Mono',monospace;font-size:.68rem;letter-spacing:2px;text-transform:uppercase;padding:10px 14px;text-align:left;border-bottom:1px solid var(--border);color:var(--muted);}
+  td{padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:top;line-height:1.5;color:#c8c8dd;}
+  td:first-child{font-weight:700;color:var(--muted);font-family:'Space Mono',monospace;font-size:.78rem;white-space:nowrap;}
+  tr:hover td{background:rgba(255,255,255,.015);}
+  .tips{background:linear-gradient(135deg,rgba(124,58,237,.08),rgba(168,255,120,.05));border:1px solid rgba(124,58,237,.3);padding:30px;margin-top:44px;}
+  .tips h2{font-size:1.25rem;font-weight:800;margin-bottom:18px;color:#c4b5fd;}
+  .tip{display:flex;gap:14px;margin-bottom:15px;align-items:flex-start;}
+  .tip .n{font-family:'Space Mono',monospace;font-size:.65rem;color:var(--accent);background:rgba(124,58,237,.2);padding:3px 8px;flex-shrink:0;margin-top:2px;letter-spacing:1px;}
+  .tip .txt{font-size:.9rem;line-height:1.65;color:#c0c0d8;}
+  @media(max-width:600px){.container{padding:24px 16px 60px;}}
+</style>
+</head>
+<body>
+<div class="container">
+  <a class="back" href="../index.html">&larr; back to Fuku Wiki</a>
+  <header>
+    <div class="tag">Week 2 · System Design · WK2-D02</div>
+    <h1>Design a Ledger &amp; Reconciliation System</h1>
+    <p class="subtitle">// guarantee no double-charge or lost transaction across failures</p>
+  </header>
+
+  <div class="section-label">// 1 — the core: an append-only double-entry ledger</div>
+  <div class="card">
+    <h2>Ledger design</h2>
+    <p>Model money as an <strong>immutable, append-only</strong> log of balanced entries. Every transaction posts equal debits and credits across accounts; the sum is always zero. You <em>never</em> update or delete a posting — a correction is a new reversing entry. That immutability is what makes the ledger auditable and safe to rebuild.</p>
+    <div class="flow"><b>Entry</b>: txn_id, account, direction(DR/CR), amount, currency, ts
+<b>Invariant</b>: sum(debits) == sum(credits) per txn_id
+<b>Balance</b>: derived = fold over entries (or a maintained snapshot)</div>
+    <ul>
+      <li><strong>Idempotency:</strong> a unique constraint on <code>(txn_id)</code> (or idempotency key) makes re-posting a no-op — the anti-double-charge guarantee lives here.</li>
+      <li><strong>Atomic multi-leg write:</strong> all legs of one transaction commit in a single DB transaction, or none do.</li>
+      <li><strong>Balances:</strong> derive by folding entries for correctness; keep a maintained running-balance snapshot for read performance, rebuildable from the log.</li>
+    </ul>
+  </div>
+
+  <div class="section-label">// 2 — durability: don't lose a transaction</div>
+  <div class="card">
+    <ul>
+      <li><strong>Write-ahead / commit the intent first:</strong> persist the transaction request durably before doing side effects, so a crash can resume.</li>
+      <li><strong>Outbox pattern:</strong> ledger write + outbound event in one transaction; a relay publishes to Kafka. Guarantees the event and the posting never diverge.</li>
+      <li><strong>At-least-once delivery + idempotent consumers</strong> = effectively exactly-once. Duplicates are harmless because the unique constraint absorbs them.</li>
+      <li><strong>Event sourcing angle:</strong> the ledger <em>is</em> the event log; current balances are a projection you can always recompute.</li>
+    </ul>
+    <p><strong>Exactly-once is a myth on the wire</strong> — you get at-least-once delivery and make processing idempotent. Say that explicitly; it signals maturity.</p>
+  </div>
+
+  <div class="section-label">// 3 — reconciliation as a safety net</div>
+  <div class="card">
+    <p>Reconciliation compares the internal ledger against <strong>external truth</strong> — bank/network settlement files, PSP reports — on a schedule (often nightly batch + intraday). It <em>detects</em> divergence; it is not the primary correctness mechanism.</p>
+    <div class="flow"><b>Load</b> external settlement file  ┐
+<b>Match</b> by reference/amount/date ┤ → 3-way: internal ⇄ acquirer ⇄ bank
+<b>Classify</b> unmatched            ┘</div>
+    <table>
+      <tr><th>Break type</th><th>Meaning &amp; action</th></tr>
+      <tr><td>Missing internal</td><td>Bank has it, we don't — investigate lost txn; post correcting entry.</td></tr>
+      <tr><td>Missing external</td><td>We have it, bank doesn't yet — timing (in-flight) or a failed settlement.</td></tr>
+      <tr><td>Amount mismatch</td><td>Fees, FX, or a bug — route to ops queue.</td></tr>
+      <tr><td>Duplicate</td><td>Idempotency failure upstream — should be rare if constraints hold.</td></tr>
+    </table>
+    <p>Unmatched items flow to an <strong>exceptions queue</strong> for automated rules + human review. Track a reconciliation-break metric; a rising trend is an early warning of an upstream bug.</p>
+  </div>
+
+  <div class="section-label">// 4 — trade-offs to state</div>
+  <div class="card">
+    <table>
+      <tr><td>Consistency</td><td>Strong within a ledger partition (ACID); the money invariant can't be eventual.</td></tr>
+      <tr><td>Partitioning</td><td>Shard by account to scale, but keep both legs of a transfer resolvable atomically (or use a saga for cross-shard with compensation).</td></tr>
+      <tr><td>Correctness net</td><td>Idempotency + immutability = primary guarantee; reconciliation = detection net.</td></tr>
+    </table>
+  </div>
+
+  <div class="tips">
+    <h2>⚡ Interview Talking Points</h2>
+    <div class="tip"><span class="n">01</span><div class="txt"><strong>Immutability first:</strong> "The ledger is append-only double-entry — corrections are reversing entries, never updates. That's what makes it auditable and rebuildable."</div></div>
+    <div class="tip"><span class="n">02</span><div class="txt"><strong>Locate the anti-double-charge guarantee precisely:</strong> "The no-double-charge property comes from a unique constraint on the transaction/idempotency key plus an atomic multi-leg write — not from reconciliation."</div></div>
+    <div class="tip"><span class="n">03</span><div class="txt"><strong>Be honest about exactly-once:</strong> "There's no exactly-once on the network — I use at-least-once delivery with idempotent consumers, so duplicates are absorbed harmlessly."</div></div>
+    <div class="tip"><span class="n">04</span><div class="txt"><strong>Frame reconciliation correctly:</strong> "Reconciliation against settlement files is a detection safety net that catches divergence early — it's not the primary correctness guarantee, and treating it as one is a red flag."</div></div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Java Core — Concurrency, JVM/GC, Patterns</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap');
+  :root{--bg:#0a0a0f;--surface:#12121a;--border:#1e1e2e;--text:#e0e0f0;--muted:#6b6b8a;--accent:#7c3aed;--c1:#00e5ff;--c2:#ff6b6b;--c3:#a8ff78;--c4:#ffd166;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;min-height:100vh;overflow-x:hidden;line-height:1.6;}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,229,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,0.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+  .container{max-width:1000px;margin:0 auto;padding:40px 24px 80px;position:relative;z-index:1;}
+  .back{font-family:'Space Mono',monospace;font-size:12px;color:var(--muted);text-decoration:none;letter-spacing:1px;}
+  .back:hover{color:var(--c1);}
+  header{margin:32px 0 50px;}
+  .tag{display:inline-block;font-family:'Space Mono',monospace;font-size:11px;color:var(--c1);border:1px solid var(--c1);padding:4px 12px;letter-spacing:3px;text-transform:uppercase;margin-bottom:20px;opacity:.8;}
+  h1{font-size:clamp(2rem,5vw,3.4rem);font-weight:800;line-height:1.05;letter-spacing:-1.5px;margin-bottom:14px;}
+  .subtitle{color:var(--muted);font-size:1rem;font-family:'Space Mono',monospace;}
+  .section-label{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:4px;text-transform:uppercase;color:var(--muted);margin:48px 0 18px;}
+  .card{background:var(--surface);border:1px solid var(--border);padding:26px 28px;margin-bottom:16px;}
+  .card h2{font-size:1.4rem;font-weight:800;letter-spacing:-.5px;margin-bottom:6px;}
+  .card .lead{color:var(--muted);font-family:'Space Mono',monospace;font-size:.8rem;margin-bottom:16px;}
+  .card p{font-size:.92rem;line-height:1.7;margin-bottom:12px;color:#c8c8dd;}
+  .card ul{list-style:none;margin:8px 0 12px;}
+  .card ul li{font-size:.9rem;line-height:1.7;padding-left:18px;position:relative;margin-bottom:5px;color:#c8c8dd;}
+  .card ul li::before{content:'→';position:absolute;left:0;color:var(--c1);opacity:.6;font-family:'Space Mono',monospace;font-size:.8rem;}
+  strong{color:#fff;}
+  .pill{display:inline-block;font-family:'Space Mono',monospace;font-size:.65rem;padding:2px 8px;border-radius:2px;letter-spacing:1px;margin-right:6px;background:rgba(0,229,255,0.12);color:var(--c1);text-transform:uppercase;}
+  .code{background:#080810;border:1px solid var(--border);padding:18px;font-family:'Space Mono',monospace;font-size:.75rem;line-height:1.75;overflow-x:auto;margin:14px 0;color:#c0c0d8;white-space:pre;}
+  .code .c{color:var(--muted);}.code .k{color:#c678dd;}.code .f{color:#61afef;}.code .s{color:#98c379;}.code .t{color:#e5c07b;}
+  table{width:100%;border-collapse:collapse;font-size:.82rem;margin:8px 0;}
+  th{font-family:'Space Mono',monospace;font-size:.68rem;letter-spacing:2px;text-transform:uppercase;padding:10px 14px;text-align:left;border-bottom:1px solid var(--border);color:var(--muted);}
+  td{padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:top;line-height:1.5;color:#c8c8dd;}
+  td:first-child{font-weight:700;color:var(--muted);font-family:'Space Mono',monospace;font-size:.78rem;white-space:nowrap;}
+  tr:hover td{background:rgba(255,255,255,.015);}
+  .tips{background:linear-gradient(135deg,rgba(124,58,237,.08),rgba(0,229,255,.05));border:1px solid rgba(124,58,237,.3);padding:30px;margin-top:48px;}
+  .tips h2{font-size:1.25rem;font-weight:800;margin-bottom:18px;color:#c4b5fd;}
+  .tip{display:flex;gap:14px;margin-bottom:15px;align-items:flex-start;}
+  .tip .n{font-family:'Space Mono',monospace;font-size:.65rem;color:var(--accent);background:rgba(124,58,237,.2);padding:3px 8px;flex-shrink:0;margin-top:2px;letter-spacing:1px;}
+  .tip .txt{font-size:.9rem;line-height:1.65;color:#c0c0d8;}
+  .qa{border-left:2px solid var(--c2);padding:2px 0 2px 16px;margin:14px 0;}
+  .qa .q{font-weight:700;color:#fff;font-size:.92rem;margin-bottom:4px;}
+  .qa .a{font-size:.88rem;color:#c8c8dd;line-height:1.65;}
+  @media(max-width:600px){.container{padding:24px 16px 60px;}}
+</style>
+</head>
+<body>
+<div class="container">
+  <a class="back" href="../index.html">&larr; back to Fuku Wiki</a>
+  <header>
+    <div class="tag">Week 1 · Java Core · WK1-J01…J03</div>
+    <h1>Java Core Fundamentals</h1>
+    <p class="subtitle">// concurrency · JVM memory &amp; GC · design principles &amp; patterns</p>
+  </header>
+
+  <!-- ============ CONCURRENCY ============ -->
+  <div class="section-label">// WK1-J01 — concurrency fundamentals</div>
+  <div class="card">
+    <h2>Concurrency</h2>
+    <div class="lead">synchronized vs Lock · thread pools · CompletableFuture · race conditions</div>
+    <p><strong>The mental model:</strong> a race condition happens when two threads touch shared, mutable state and at least one writes, with no ordering guarantee between them. You fix it by removing sharing, removing mutation, or adding coordination.</p>
+
+    <p><strong>synchronized vs Lock (ReentrantLock).</strong> Both give mutual exclusion + visibility. Reach for <code>Lock</code> when you need what <code>synchronized</code> can't do:</p>
+    <ul>
+      <li><strong>tryLock / timed lock</strong> — back off instead of blocking forever (deadlock avoidance)</li>
+      <li><strong>interruptible</strong> acquisition — cancel a thread waiting on a lock</li>
+      <li><strong>fairness</strong> policy, and <strong>multiple Conditions</strong> per lock (e.g. notFull / notEmpty)</li>
+      <li><strong>ReadWriteLock</strong> — many readers, one writer, for read-heavy state</li>
+    </ul>
+    <p><code>synchronized</code> is simpler, JIT-optimized (biased/lightweight locking), and auto-releases on exception. Default to it; upgrade to <code>Lock</code> only for the features above.</p>
+
+    <p><strong>Thread pools (ExecutorService).</strong> Never <code>new Thread()</code> per task in a service. Size pools by workload:</p>
+    <table>
+      <tr><th>Workload</th><th>Sizing rule</th></tr>
+      <tr><td>CPU-bound</td><td>~ #cores (+1)</td></tr>
+      <tr><td>IO-bound</td><td>higher — cores × (1 + wait/compute)</td></tr>
+      <tr><td>Isolation</td><td>separate pools per dependency (bulkhead)</td></tr>
+    </table>
+    <p>Prefer a bounded queue + explicit <code>RejectedExecutionHandler</code> — an unbounded queue turns backpressure into an OOM.</p>
+
+    <p><strong>CompletableFuture</strong> — compose async work without blocking threads:</p>
+    <div class="code"><span class="c">// fan-out two calls, combine, with a timeout + fallback</span>
+<span class="t">CompletableFuture</span>&lt;<span class="t">Risk</span>&gt; risk  = supplyAsync(() -&gt; riskClient.score(req), pool);
+<span class="t">CompletableFuture</span>&lt;<span class="t">Limit</span>&gt; limit = supplyAsync(() -&gt; limitClient.get(req), pool);
+
+risk.<span class="f">thenCombine</span>(limit, (r, l) -&gt; decide(r, l))
+    .<span class="f">orTimeout</span>(<span class="t">300</span>, MILLIS)
+    .<span class="f">exceptionally</span>(ex -&gt; Decision.<span class="f">reviewLater</span>());</div>
+    <p>Key gotchas: <code>thenApply</code> (sync, same thread) vs <code>thenApplyAsync</code> (handed to a pool); always pass <em>your</em> executor, never rely on the common ForkJoinPool for blocking IO.</p>
+
+    <p><strong>Modern concurrency utilities to name-drop:</strong> <code>AtomicLong</code>/<code>LongAdder</code> (lock-free counters), <code>ConcurrentHashMap</code>, <code>BlockingQueue</code> (producer/consumer), <code>CountDownLatch</code>/<code>CyclicBarrier</code>, and <strong>virtual threads (Project Loom, Java 21)</strong> — cheap threads that make the thread-per-request model viable again for IO-bound services.</p>
+    <div class="qa">
+      <div class="q">Q: How do you make a class thread-safe?</div>
+      <div class="a">A: In priority order — (1) make it immutable (final fields, no setters); (2) confine state to one thread; (3) use concurrent collections / atomics; (4) only then reach for explicit locks, holding them for the shortest critical section possible.</div>
+    </div>
+  </div>
+
+  <!-- ============ JVM / GC ============ -->
+  <div class="section-label">// WK1-J02 — JVM memory &amp; garbage collection</div>
+  <div class="card">
+    <h2>JVM Memory &amp; GC</h2>
+    <div class="lead">reason about trade-offs — you don't need to tune flags live</div>
+    <p><strong>Memory regions:</strong> the <strong>heap</strong> (young gen = Eden + survivors, old gen) holds objects; <strong>metaspace</strong> holds class metadata (native memory, not heap); each thread has a <strong>stack</strong>. Most objects die young — that's the assumption every collector exploits (generational hypothesis).</p>
+    <p><strong>How GC works:</strong> mark reachable objects from GC roots, sweep/compact the rest. A young (minor) GC is cheap and frequent; a full/old GC is expensive. The whole game is minimizing <em>pause time</em> and <em>frequency</em> while keeping throughput.</p>
+    <table>
+      <tr><th>Collector</th><th>Optimizes for</th><th>Use when</th></tr>
+      <tr><td>G1 (default)</td><td>balanced, predictable pauses</td><td>most services; heaps up to ~tens of GB</td></tr>
+      <tr><td>ZGC</td><td>ultra-low pause (&lt;1ms), huge heaps</td><td>latency-critical, large heap (payments!)</td></tr>
+      <tr><td>Shenandoah</td><td>low pause, concurrent compaction</td><td>similar niche to ZGC</td></tr>
+      <tr><td>Parallel</td><td>raw throughput, pauses OK</td><td>batch / offline jobs</td></tr>
+    </table>
+    <p><strong>The trade-off in one sentence:</strong> low-pause collectors (ZGC/Shenandoah) do more work concurrently with your app, spending CPU and a bit of throughput to avoid stop-the-world pauses — exactly the deal you want for a payment API with a p99 latency SLA.</p>
+    <ul>
+      <li><strong>Memory leak in Java:</strong> objects still <em>reachable</em> but never used — static collections that only grow, unbounded caches, unclosed resources, listeners never deregistered.</li>
+      <li><strong>OOM causes:</strong> heap too small, a leak, or genuinely too much live data. Capture a heap dump (<code>-XX:+HeapDumpOnOutOfMemoryError</code>) and read it, don't just bump <code>-Xmx</code>.</li>
+      <li><strong>Stop-the-world:</strong> phases where all app threads pause. Long STW = latency spikes = failed payments. This is why collector choice matters.</li>
+    </ul>
+    <div class="qa">
+      <div class="q">Q: Your service has p99 latency spikes every few minutes. First hypothesis?</div>
+      <div class="a">A: GC pauses. Check GC logs for full-GC frequency/duration correlated with the spikes. Fixes: right-size the heap, move to a low-pause collector (ZGC), or reduce allocation rate / a leak that keeps triggering old-gen collection.</div>
+    </div>
+  </div>
+
+  <!-- ============ DESIGN PATTERNS ============ -->
+  <div class="section-label">// WK1-J03 — design principles &amp; patterns</div>
+  <div class="card">
+    <h2>SOLID &amp; Patterns for Payments</h2>
+    <div class="lead">principles you defend + the 5 patterns that actually show up in payment code</div>
+    <p><strong>SOLID, one line each:</strong></p>
+    <ul>
+      <li><strong>S</strong>ingle Responsibility — one reason to change per class</li>
+      <li><strong>O</strong>pen/Closed — extend without editing (new payment method = new Strategy, not a new <code>if</code>)</li>
+      <li><strong>L</strong>iskov — subtypes must honor the base contract</li>
+      <li><strong>I</strong>nterface Segregation — many small interfaces &gt; one fat one</li>
+      <li><strong>D</strong>ependency Inversion — depend on abstractions; inject the concrete</li>
+    </ul>
+    <table>
+      <tr><th>Pattern</th><th>In payments</th></tr>
+      <tr><td>Strategy</td><td>Pluggable payment methods / acquirers / fee rules — pick behavior at runtime, no giant switch.</td></tr>
+      <tr><td>Chain of Responsibility</td><td>A processing pipeline: validate → fraud → auth → ledger. Each handler passes or rejects.</td></tr>
+      <tr><td>Circuit Breaker</td><td>Stop hammering a failing bank/partner; fail fast, recover automatically.</td></tr>
+      <tr><td>Saga</td><td>Long-running distributed transaction as a sequence of local txns + compensations (no 2PC).</td></tr>
+      <tr><td>Idempotent Consumer</td><td>Dedup by idempotency key so a retried/redelivered message charges exactly once.</td></tr>
+    </table>
+    <div class="code"><span class="c">// Strategy — Open/Closed in action</span>
+<span class="k">interface</span> <span class="t">PaymentMethod</span> { <span class="t">Result</span> <span class="f">charge</span>(<span class="t">Money</span> amt, <span class="t">Context</span> ctx); }
+<span class="k">class</span> <span class="t">CardPayment</span>   <span class="k">implements</span> <span class="t">PaymentMethod</span> { ... }
+<span class="k">class</span> <span class="t">VietQrPayment</span> <span class="k">implements</span> <span class="t">PaymentMethod</span> { ... }
+<span class="c">// new method = new class. Existing code never changes.</span></div>
+    <div class="qa">
+      <div class="q">Q: Where would you use Chain of Responsibility vs Strategy?</div>
+      <div class="a">A: Strategy picks <em>one</em> interchangeable algorithm. Chain runs a <em>sequence</em> of handlers where any can short-circuit. A payment request flows through a chain (fraud, limits, auth); within the auth step, a Strategy selects which acquirer to call.</div>
+    </div>
+  </div>
+
+  <div class="tips">
+    <h2>⚡ Interview Talking Points</h2>
+    <div class="tip"><span class="n">01</span><div class="txt"><strong>Frame concurrency around state, not keywords:</strong> "Thread-safety is about shared mutable state. I remove sharing or mutation first — immutability and confinement — and only reach for locks when I genuinely must coordinate."</div></div>
+    <div class="tip"><span class="n">02</span><div class="txt"><strong>Show you reason about GC, not tune it:</strong> "For a payments API I care about tail latency, so I'd lean toward a low-pause collector like ZGC — it trades a little throughput and CPU to avoid stop-the-world pauses that would show up as failed transactions."</div></div>
+    <div class="tip"><span class="n">03</span><div class="txt"><strong>Tie patterns to real code:</strong> "Adding a new payment method shouldn't mean editing a switch statement — that's Open/Closed. I model methods as a Strategy and the processing steps as a Chain of Responsibility."</div></div>
+    <div class="tip"><span class="n">04</span><div class="txt"><strong>Name-drop Loom to sound current:</strong> "Virtual threads make the simple thread-per-request model viable again for IO-bound services — you get readable blocking code without exhausting OS threads."</div></div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spring &amp; Microservices — Boot vs Cloud, Comms, Resilience</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap');
+  :root{--bg:#0a0a0f;--surface:#12121a;--border:#1e1e2e;--text:#e0e0f0;--muted:#6b6b8a;--accent:#7c3aed;--c1:#a8ff78;--c2:#ff6b6b;--c3:#00e5ff;--c4:#ffd166;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;min-height:100vh;overflow-x:hidden;line-height:1.6;}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(168,255,120,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(168,255,120,0.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+  .container{max-width:1000px;margin:0 auto;padding:40px 24px 80px;position:relative;z-index:1;}
+  .back{font-family:'Space Mono',monospace;font-size:12px;color:var(--muted);text-decoration:none;letter-spacing:1px;}
+  .back:hover{color:var(--c1);}
+  header{margin:32px 0 50px;}
+  .tag{display:inline-block;font-family:'Space Mono',monospace;font-size:11px;color:var(--c1);border:1px solid var(--c1);padding:4px 12px;letter-spacing:3px;text-transform:uppercase;margin-bottom:20px;opacity:.8;}
+  h1{font-size:clamp(2rem,5vw,3.4rem);font-weight:800;line-height:1.05;letter-spacing:-1.5px;margin-bottom:14px;}
+  .subtitle{color:var(--muted);font-size:1rem;font-family:'Space Mono',monospace;}
+  .section-label{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:4px;text-transform:uppercase;color:var(--muted);margin:48px 0 18px;}
+  .card{background:var(--surface);border:1px solid var(--border);padding:26px 28px;margin-bottom:16px;}
+  .card h2{font-size:1.4rem;font-weight:800;letter-spacing:-.5px;margin-bottom:6px;}
+  .card .lead{color:var(--muted);font-family:'Space Mono',monospace;font-size:.8rem;margin-bottom:16px;}
+  .card p{font-size:.92rem;line-height:1.7;margin-bottom:12px;color:#c8c8dd;}
+  .card ul{list-style:none;margin:8px 0 12px;}
+  .card ul li{font-size:.9rem;line-height:1.7;padding-left:18px;position:relative;margin-bottom:5px;color:#c8c8dd;}
+  .card ul li::before{content:'→';position:absolute;left:0;color:var(--c1);opacity:.6;font-family:'Space Mono',monospace;font-size:.8rem;}
+  strong{color:#fff;}
+  .code{background:#080810;border:1px solid var(--border);padding:18px;font-family:'Space Mono',monospace;font-size:.75rem;line-height:1.75;overflow-x:auto;margin:14px 0;color:#c0c0d8;white-space:pre;}
+  .code .c{color:var(--muted);}.code .k{color:#c678dd;}.code .f{color:#61afef;}.code .s{color:#98c379;}.code .t{color:#e5c07b;}
+  table{width:100%;border-collapse:collapse;font-size:.82rem;margin:8px 0;}
+  th{font-family:'Space Mono',monospace;font-size:.68rem;letter-spacing:2px;text-transform:uppercase;padding:10px 14px;text-align:left;border-bottom:1px solid var(--border);color:var(--muted);}
+  td{padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:top;line-height:1.5;color:#c8c8dd;}
+  td:first-child{font-weight:700;color:var(--muted);font-family:'Space Mono',monospace;font-size:.78rem;white-space:nowrap;}
+  tr:hover td{background:rgba(255,255,255,.015);}
+  .tips{background:linear-gradient(135deg,rgba(124,58,237,.08),rgba(168,255,120,.05));border:1px solid rgba(124,58,237,.3);padding:30px;margin-top:48px;}
+  .tips h2{font-size:1.25rem;font-weight:800;margin-bottom:18px;color:#c4b5fd;}
+  .tip{display:flex;gap:14px;margin-bottom:15px;align-items:flex-start;}
+  .tip .n{font-family:'Space Mono',monospace;font-size:.65rem;color:var(--accent);background:rgba(124,58,237,.2);padding:3px 8px;flex-shrink:0;margin-top:2px;letter-spacing:1px;}
+  .tip .txt{font-size:.9rem;line-height:1.65;color:#c0c0d8;}
+  .qa{border-left:2px solid var(--c2);padding:2px 0 2px 16px;margin:14px 0;}
+  .qa .q{font-weight:700;color:#fff;font-size:.92rem;margin-bottom:4px;}
+  .qa .a{font-size:.88rem;color:#c8c8dd;line-height:1.65;}
+  @media(max-width:600px){.container{padding:24px 16px 60px;}}
+</style>
+</head>
+<body>
+<div class="container">
+  <a class="back" href="../index.html">&larr; back to Fuku Wiki</a>
+  <header>
+    <div class="tag">Week 1 · Spring / Microservices · WK1-S01…S03</div>
+    <h1>Spring &amp; Microservices</h1>
+    <p class="subtitle">// Boot vs Cloud · service communication · resilience patterns</p>
+  </header>
+
+  <!-- ============ BOOT vs CLOUD ============ -->
+  <div class="section-label">// WK1-S01 — Spring Boot vs Spring Cloud</div>
+  <div class="card">
+    <h2>Boot vs Cloud — what each layer solves</h2>
+    <div class="lead">one builds the service, the other coordinates a fleet of them</div>
+    <p><strong>Spring Boot</strong> makes a <em>single</em> service easy: auto-configuration, embedded server, starters, opinionated defaults, production actuators (health, metrics). It answers "how do I ship one runnable app fast?"</p>
+    <p><strong>Spring Cloud</strong> sits on top and solves the problems that only appear once you have <em>many</em> services talking to each other:</p>
+    <table>
+      <tr><th>Concern</th><th>Spring Cloud piece</th></tr>
+      <tr><td>Config</td><td>Config Server — externalized, versioned config</td></tr>
+      <tr><td>Discovery</td><td>Eureka / Consul — find service instances dynamically</td></tr>
+      <tr><td>Gateway</td><td>Spring Cloud Gateway — routing, auth, rate-limit at the edge</td></tr>
+      <tr><td>Resilience</td><td>Resilience4j — circuit breaker, retry, bulkhead</td></tr>
+      <tr><td>Tracing</td><td>Micrometer / Sleuth → distributed traces</td></tr>
+    </table>
+    <p><strong>The honest caveat:</strong> a lot of what Spring Cloud once owned is now handled by the platform — Kubernetes does discovery (DNS/Services), config (ConfigMaps/Secrets), and a service mesh (Istio/Linkerd) can do retries and circuit breaking. Say that; it shows you know where the industry moved.</p>
+    <div class="qa">
+      <div class="q">Q: Do you still need Spring Cloud on Kubernetes?</div>
+      <div class="a">A: Less of it. K8s covers discovery and config; a mesh covers traffic resilience. I'd still use Boot for the app and Resilience4j for app-level fallbacks, but I wouldn't reflexively add Eureka/Config Server if the platform already provides those primitives.</div>
+    </div>
+  </div>
+
+  <!-- ============ COMMUNICATION ============ -->
+  <div class="section-label">// WK1-S02 — service communication choices</div>
+  <div class="card">
+    <h2>REST vs gRPC vs Async Messaging</h2>
+    <div class="lead">and when you'd pick each in a payment flow</div>
+    <table>
+      <tr><th></th><th>REST/JSON</th><th>gRPC</th><th>Async (Kafka/Rabbit)</th></tr>
+      <tr><td>Style</td><td>request/response</td><td>request/response</td><td>fire-and-forget / events</td></tr>
+      <tr><td>Coupling</td><td>temporal (both up)</td><td>temporal (both up)</td><td>decoupled in time</td></tr>
+      <tr><td>Perf</td><td>good</td><td>best (HTTP/2, protobuf, streaming)</td><td>high throughput</td></tr>
+      <tr><td>Best for</td><td>public/partner APIs</td><td>internal service-to-service</td><td>events, buffering, decoupling</td></tr>
+    </table>
+    <p><strong>In a payment flow, mix them deliberately:</strong></p>
+    <ul>
+      <li><strong>Synchronous where the caller must know the result now</strong> — the merchant needs an auth decision before showing "approved". REST at the edge, maybe gRPC internally to the risk/auth services.</li>
+      <li><strong>Asynchronous for everything that can happen after</strong> — emit a <code>PaymentAuthorized</code> event; ledger posting, notifications, analytics, and settlement all consume it. This buffers spikes and decouples the slow parts from the hot path.</li>
+    </ul>
+    <p><strong>Kafka vs RabbitMQ:</strong> Kafka = durable, replayable log, high throughput, great for event streaming and audit trails (payments love replay for reconciliation). RabbitMQ = flexible routing, per-message ack, good for classic task queues. For a payments event backbone, Kafka's ordered, retained log is usually the better fit.</p>
+    <div class="qa">
+      <div class="q">Q: Why not make the whole payment flow synchronous?</div>
+      <div class="a">A: Every synchronous hop couples availability — if settlement is down, you can't authorize. Keeping the hot path (auth) sync and pushing the rest onto an event log means a downstream outage degrades gracefully instead of failing the customer's payment.</div>
+    </div>
+  </div>
+
+  <!-- ============ RESILIENCE ============ -->
+  <div class="section-label">// WK1-S03 — resilience patterns</div>
+  <div class="card">
+    <h2>Resilience Patterns</h2>
+    <div class="lead">a stuck downstream call is how one dependency takes down the whole gateway</div>
+    <table>
+      <tr><th>Pattern</th><th>Problem it solves</th></tr>
+      <tr><td>Timeout</td><td>Never wait forever. A hung call holds a thread; enough of them exhaust the pool.</td></tr>
+      <tr><td>Retry + backoff</td><td>Ride out transient blips — with exponential backoff + jitter so you don't stampede a recovering service. Only retry <em>idempotent</em> ops.</td></tr>
+      <tr><td>Circuit Breaker</td><td>After N failures, "open" and fail fast for a cooldown, then "half-open" to test recovery. Stops cascading waits.</td></tr>
+      <tr><td>Bulkhead</td><td>Isolate resources per dependency (separate thread pools / connection limits) so one slow partner can't drown the others.</td></tr>
+      <tr><td>Fallback</td><td>Graceful degradation — cached response, queue-for-later, or a clear decline instead of a hang.</td></tr>
+      <tr><td>Rate limit</td><td>Protect yourself and downstreams from overload / abuse.</td></tr>
+    </table>
+    <div class="code"><span class="c">// Resilience4j — annotations compose</span>
+<span class="k">@CircuitBreaker</span>(name = <span class="s">"acquirer"</span>, fallbackMethod = <span class="s">"queueForRetry"</span>)
+<span class="k">@Retry</span>(name = <span class="s">"acquirer"</span>)          <span class="c">// exp backoff + jitter</span>
+<span class="k">@Bulkhead</span>(name = <span class="s">"acquirer"</span>)        <span class="c">// isolate this partner</span>
+<span class="k">@TimeLimiter</span>(name = <span class="s">"acquirer"</span>)
+<span class="k">public</span> <span class="t">CompletableFuture</span>&lt;<span class="t">Auth</span>&gt; <span class="f">authorize</span>(<span class="t">Charge</span> c) { ... }</div>
+    <p><strong>Critical nuance for payments:</strong> retry is dangerous without <strong>idempotency</strong>. If you retry a charge that actually succeeded but whose response was lost, you double-charge. Every retryable payment operation must carry an <strong>idempotency key</strong> so the server dedupes. (See the Payments Vocabulary page.)</p>
+    <div class="qa">
+      <div class="q">Q: A downstream bank API starts responding in 30s instead of 200ms. What protects you?</div>
+      <div class="a">A: A tight <strong>timeout</strong> caps the wait; a <strong>bulkhead</strong> keeps those slow calls off the threads serving other partners; the <strong>circuit breaker</strong> trips after repeated timeouts so we fail fast and shed load; a <strong>fallback</strong> queues the request for retry. Together they contain the blast radius to that one partner.</div>
+    </div>
+  </div>
+
+  <div class="tips">
+    <h2>⚡ Interview Talking Points</h2>
+    <div class="tip"><span class="n">01</span><div class="txt"><strong>Distinguish Boot from Cloud crisply:</strong> "Boot makes one service productive; Cloud coordinates many. On Kubernetes I let the platform own discovery and config, and keep app-level resilience in Resilience4j."</div></div>
+    <div class="tip"><span class="n">02</span><div class="txt"><strong>Justify sync vs async by coupling:</strong> "I keep the authorization hot path synchronous because the merchant needs an answer, and push ledger, notifications and settlement onto an event log so a downstream outage degrades gracefully instead of failing the payment."</div></div>
+    <div class="tip"><span class="n">03</span><div class="txt"><strong>Always pair retry with idempotency:</strong> "Retries are only safe if the operation is idempotent — in payments that means an idempotency key the server dedupes on, otherwise a retried-but-actually-succeeded charge double-charges."</div></div>
+    <div class="tip"><span class="n">04</span><div class="txt"><strong>Tell the cascade story:</strong> "One slow dependency exhausts the thread pool and takes down endpoints that don't even use it. Timeout + bulkhead + circuit breaker exist to contain that blast radius."</div></div>
+  </div>
+</div>
+</body>
+</html>

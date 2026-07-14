@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Payments Vocabulary — ISO 8583, Idempotency, Ledger, PCI, Saga, Vietnam</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap');
+  :root{--bg:#0a0a0f;--surface:#12121a;--border:#1e1e2e;--text:#e0e0f0;--muted:#6b6b8a;--accent:#7c3aed;--c1:#ffd166;--c2:#ff6b6b;--c3:#00e5ff;--c4:#a8ff78;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;min-height:100vh;overflow-x:hidden;line-height:1.6;}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(255,209,102,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,209,102,0.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+  .container{max-width:1000px;margin:0 auto;padding:40px 24px 80px;position:relative;z-index:1;}
+  .back{font-family:'Space Mono',monospace;font-size:12px;color:var(--muted);text-decoration:none;letter-spacing:1px;}
+  .back:hover{color:var(--c1);}
+  header{margin:32px 0 50px;}
+  .tag{display:inline-block;font-family:'Space Mono',monospace;font-size:11px;color:var(--c1);border:1px solid var(--c1);padding:4px 12px;letter-spacing:3px;text-transform:uppercase;margin-bottom:20px;opacity:.8;}
+  h1{font-size:clamp(2rem,5vw,3.4rem);font-weight:800;line-height:1.05;letter-spacing:-1.5px;margin-bottom:14px;}
+  .subtitle{color:var(--muted);font-size:1rem;font-family:'Space Mono',monospace;}
+  .section-label{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:4px;text-transform:uppercase;color:var(--muted);margin:48px 0 18px;}
+  .card{background:var(--surface);border:1px solid var(--border);padding:26px 28px;margin-bottom:16px;}
+  .card h2{font-size:1.35rem;font-weight:800;letter-spacing:-.5px;margin-bottom:6px;}
+  .card .lead{color:var(--muted);font-family:'Space Mono',monospace;font-size:.8rem;margin-bottom:16px;}
+  .card p{font-size:.92rem;line-height:1.7;margin-bottom:12px;color:#c8c8dd;}
+  .card ul{list-style:none;margin:8px 0 12px;}
+  .card ul li{font-size:.9rem;line-height:1.7;padding-left:18px;position:relative;margin-bottom:5px;color:#c8c8dd;}
+  .card ul li::before{content:'→';position:absolute;left:0;color:var(--c1);opacity:.6;font-family:'Space Mono',monospace;font-size:.8rem;}
+  strong{color:#fff;}
+  .code{background:#080810;border:1px solid var(--border);padding:18px;font-family:'Space Mono',monospace;font-size:.75rem;line-height:1.75;overflow-x:auto;margin:14px 0;color:#c0c0d8;white-space:pre;}
+  .code .c{color:var(--muted);}.code .k{color:#c678dd;}.code .f{color:#61afef;}.code .s{color:#98c379;}.code .t{color:#e5c07b;}
+  table{width:100%;border-collapse:collapse;font-size:.82rem;margin:8px 0;}
+  th{font-family:'Space Mono',monospace;font-size:.68rem;letter-spacing:2px;text-transform:uppercase;padding:10px 14px;text-align:left;border-bottom:1px solid var(--border);color:var(--muted);}
+  td{padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:top;line-height:1.5;color:#c8c8dd;}
+  td:first-child{font-weight:700;color:var(--muted);font-family:'Space Mono',monospace;font-size:.78rem;white-space:nowrap;}
+  tr:hover td{background:rgba(255,255,255,.015);}
+  .tips{background:linear-gradient(135deg,rgba(124,58,237,.08),rgba(255,209,102,.05));border:1px solid rgba(124,58,237,.3);padding:30px;margin-top:48px;}
+  .tips h2{font-size:1.25rem;font-weight:800;margin-bottom:18px;color:#c4b5fd;}
+  .tip{display:flex;gap:14px;margin-bottom:15px;align-items:flex-start;}
+  .tip .n{font-family:'Space Mono',monospace;font-size:.65rem;color:var(--accent);background:rgba(124,58,237,.2);padding:3px 8px;flex-shrink:0;margin-top:2px;letter-spacing:1px;}
+  .tip .txt{font-size:.9rem;line-height:1.65;color:#c0c0d8;}
+  .qa{border-left:2px solid var(--c2);padding:2px 0 2px 16px;margin:14px 0;}
+  .qa .q{font-weight:700;color:#fff;font-size:.92rem;margin-bottom:4px;}
+  .qa .a{font-size:.88rem;color:#c8c8dd;line-height:1.65;}
+  @media(max-width:600px){.container{padding:24px 16px 60px;}}
+</style>
+</head>
+<body>
+<div class="container">
+  <a class="back" href="../index.html">&larr; back to Fuku Wiki</a>
+  <header>
+    <div class="tag">Week 1 · Payments Vocabulary · WK1-P01…P06</div>
+    <h1>Payments Vocabulary</h1>
+    <p class="subtitle">// the language the panel expects you to speak fluently</p>
+  </header>
+
+  <!-- P01 -->
+  <div class="section-label">// WK1-P01 — ISO 8583 vs modern REST/JSON</div>
+  <div class="card">
+    <h2>ISO 8583 vs Modern Payment APIs</h2>
+    <div class="lead">how cards talked for 40 years vs how gateways talk today</div>
+    <p><strong>ISO 8583</strong> is the legacy binary messaging standard behind card networks (ATMs, POS, Visa/Mastercard rails). Messages are a Message Type Indicator + a <em>bitmap</em> indicating which numbered <em>data elements</em> are present (DE2 = PAN, DE4 = amount, DE39 = response code…). Compact, fixed-ish, ubiquitous in banking — and painful: positional, poorly self-describing, many regional variants.</p>
+    <p><strong>Modern gateways</strong> (Stripe, Adyen, local PSPs) expose <strong>REST/JSON over HTTPS</strong>: human-readable, versioned, webhook-driven, easy to integrate. Under the hood they still translate down to ISO 8583 / network-specific formats when they hit the card rails.</p>
+    <p><strong>The one-liner:</strong> "ISO 8583 is the wire format at the network layer; REST/JSON is the developer-facing API. A gateway's job includes bridging the two."</p>
+  </div>
+
+  <!-- P02 -->
+  <div class="section-label">// WK1-P02 — idempotency keys ★</div>
+  <div class="card">
+    <h2>Idempotency Keys</h2>
+    <div class="lead">the single most-asked concept in payment gateway interviews</div>
+    <p><strong>Problem:</strong> networks are unreliable. A client sends "charge $50", the charge succeeds, but the response is lost. The client retries. Without protection, you charge twice.</p>
+    <p><strong>Solution:</strong> the client generates a unique <strong>idempotency key</strong> (e.g. a UUID) per logical operation and sends it on every retry. The server stores the key with the result. Same key again → return the <em>stored</em> result, don't re-execute.</p>
+    <div class="code"><span class="c">// POST /charges   Idempotency-Key: 7f3c...-uuid</span>
+<span class="k">if</span> (store.<span class="f">exists</span>(key)) <span class="k">return</span> store.<span class="f">get</span>(key);   <span class="c">// replay prior result</span>
+<span class="t">Result</span> r = <span class="f">executeCharge</span>(req);                   <span class="c">// do it once</span>
+store.<span class="f">put</span>(key, r, <span class="t">24</span>h);                        <span class="c">// dedup window</span>
+<span class="k">return</span> r;</div>
+    <ul>
+      <li>Store the key <strong>atomically</strong> with the charge (same DB txn) or use a unique constraint — otherwise two concurrent retries both slip through.</li>
+      <li>Bind the key to the <strong>request payload hash</strong> so the same key with a different amount is rejected, not silently replayed.</li>
+      <li>Give keys a TTL; keys are scoped per endpoint/merchant.</li>
+    </ul>
+    <p><strong>Idempotent vs at-least-once:</strong> message systems deliver <em>at least once</em>, so consumers must be idempotent — same "Idempotent Consumer" pattern applied to events.</p>
+  </div>
+
+  <!-- P03 -->
+  <div class="section-label">// WK1-P03 — ledger, reconciliation, settlement vs clearing</div>
+  <div class="card">
+    <h2>Ledger · Reconciliation · Clearing vs Settlement</h2>
+    <div class="lead">double-entry mechanics and what actually moves money</div>
+    <p><strong>Double-entry ledger:</strong> every transaction is recorded as balanced debits and credits across accounts — the books always sum to zero. It's <strong>append-only</strong> (you never edit a posting; you post a reversing entry). This gives an auditable, tamper-evident history — the source of truth for balances.</p>
+    <ul>
+      <li><strong>Authorization</strong> — check &amp; hold funds; no money moved yet.</li>
+      <li><strong>Capture</strong> — commit the authorized amount.</li>
+      <li><strong>Clearing</strong> — networks exchange transaction details and net out who owes whom.</li>
+      <li><strong>Settlement</strong> — the actual movement of funds between banks (often T+1/T+2, batched).</li>
+    </ul>
+    <p><strong>Reconciliation</strong> = comparing your internal ledger against external statements (bank/network settlement files) to catch mismatches — missing, duplicated, or wrong-amount transactions. It's a <em>safety net</em>, run continuously, not the primary correctness guarantee.</p>
+    <div class="qa">
+      <div class="q">Q: Clearing vs settlement in one breath?</div>
+      <div class="a">A: Clearing is agreeing on <em>what</em> is owed (exchanging and netting transaction data); settlement is actually <em>moving</em> the money to discharge those obligations.</div>
+    </div>
+  </div>
+
+  <!-- P04 -->
+  <div class="section-label">// WK1-P04 — PCI-DSS basics</div>
+  <div class="card">
+    <h2>PCI-DSS Basics</h2>
+    <div class="lead">the security bar for anyone touching card data</div>
+    <p><strong>PCI-DSS</strong> (Payment Card Industry Data Security Standard) governs how cardholder data is handled. The engineering-relevant essentials:</p>
+    <ul>
+      <li><strong>Never store the raw PAN</strong> (card number) if you can avoid it; never store CVV after authorization, ever.</li>
+      <li><strong>Tokenization</strong> — replace the PAN with a meaningless token; the real number lives in a vault. Shrinks your PCI scope dramatically.</li>
+      <li><strong>Encryption</strong> at rest and in transit (TLS everywhere).</li>
+      <li><strong>Least privilege &amp; segmentation</strong> — restrict who/what can reach the cardholder-data environment; log and monitor access.</li>
+    </ul>
+    <p><strong>Scope reduction is the game:</strong> the less card data flows through your systems (tokenization, hosted fields, redirect flows), the cheaper and safer your compliance.</p>
+  </div>
+
+  <!-- P05 -->
+  <div class="section-label">// WK1-P05 — 2PC vs Saga ★</div>
+  <div class="card">
+    <h2>2PC vs Saga</h2>
+    <div class="lead">distributed transactions — Saga is what real payment systems use</div>
+    <table>
+      <tr><th></th><th>Two-Phase Commit</th><th>Saga</th></tr>
+      <tr><td>How</td><td>coordinator: prepare → commit across all</td><td>sequence of local txns + compensations</td></tr>
+      <tr><td>Consistency</td><td>strong (ACID across services)</td><td>eventual</td></tr>
+      <tr><td>Locking</td><td>holds locks until commit — blocking</td><td>no global locks</td></tr>
+      <tr><td>Failure</td><td>coordinator is a SPOF; blocks on crash</td><td>compensate completed steps</td></tr>
+      <tr><td>Scale</td><td>poor under load / partitions</td><td>scales, availability-friendly</td></tr>
+    </table>
+    <p><strong>Saga in practice:</strong> a payment = reserve funds → charge → post ledger → notify. If a later step fails, run <strong>compensating actions</strong> for the completed ones (e.g. release the reservation, post a reversal). Two flavors: <strong>choreography</strong> (services react to each other's events — decoupled but harder to trace) and <strong>orchestration</strong> (a central orchestrator drives the steps — clearer, easier to reason about).</p>
+    <div class="qa">
+      <div class="q">Q: Why not 2PC for payments?</div>
+      <div class="a">A: 2PC holds locks and blocks on coordinator failure — unacceptable for a high-throughput, always-on payment system, and most modern datastores/queues don't support it well. Saga trades strong consistency for availability and uses compensations to reach a correct end state.</div>
+    </div>
+  </div>
+
+  <!-- P06 -->
+  <div class="section-label">// WK1-P06 — Vietnam-specific context</div>
+  <div class="card">
+    <h2>Vietnam Fintech Context</h2>
+    <div class="lead">local awareness a generic candidate won't have</div>
+    <table>
+      <tr><td>Napas</td><td>National payment switch — operates the domestic <strong>24/7 real-time interbank</strong> transfer network and card switching. The rails most local e-wallets/banks ride on.</td></tr>
+      <tr><td>VietQR</td><td>Standardized QR code scheme (built on Napas) for account-to-account transfers &amp; merchant payments — hugely popular, near-instant, low cost.</td></tr>
+      <tr><td>SBV</td><td>State Bank of Vietnam — the central bank / regulator. Sets licensing, intermediary payment service rules, and increasingly data/e-wallet regulation.</td></tr>
+      <tr><td>e-KYC</td><td>Electronic Know-Your-Customer — remote identity verification (ID + biometric/liveness). Enabled account opening &amp; wallet onboarding without a branch visit.</td></tr>
+      <tr><td>Wallets</td><td>MoMo, ZaloPay, VNPay — dominant e-wallets; VNPay/Payoo strong on merchant QR acquiring.</td></tr>
+    </table>
+    <p><strong>Talking point:</strong> "Vietnam skipped a lot of card infrastructure and went straight to QR + real-time A2A via Napas/VietQR — so a modern gateway here optimizes for instant bank transfers and wallet rails, not just card processing, and has to stay inside SBV's intermediary-payment licensing and e-KYC requirements."</p>
+  </div>
+
+  <div class="tips">
+    <h2>⚡ Interview Talking Points</h2>
+    <div class="tip"><span class="n">01</span><div class="txt"><strong>Lead every retry answer with idempotency:</strong> "In payments, safe retries require an idempotency key the server dedupes on — that's how you turn an unreliable network into exactly-once charging."</div></div>
+    <div class="tip"><span class="n">02</span><div class="txt"><strong>Show ledger discipline:</strong> "Balances live in an append-only double-entry ledger — you never mutate a posting, you post a reversal. Reconciliation against settlement files is the safety net, not the source of truth."</div></div>
+    <div class="tip"><span class="n">03</span><div class="txt"><strong>Default to Saga, and know why:</strong> "Real payment systems use Sagas with compensations, not 2PC — 2PC's locking and coordinator dependency don't survive high throughput or partitions."</div></div>
+    <div class="tip"><span class="n">04</span><div class="txt"><strong>Drop local knowledge:</strong> "Napas runs the 24/7 interbank rails, VietQR standardizes QR payments on top, and SBV is the regulator with e-KYC and intermediary-payment licensing — context a non-local candidate simply won't have."</div></div>
+  </div>
+</div>
+</body>
+</html>
